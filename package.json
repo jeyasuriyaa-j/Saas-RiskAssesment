@@ -1,0 +1,37 @@
+{
+  "name": "risk-assessment-saas",
+  "version": "1.0.0",
+  "description": "Enterprise-grade risk management platform that replaces Excel with intelligent, automated risk assessment.",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend && npm install --prefix landing",
+    "setup": "npm run install:all && cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env && cp landing/.env.example landing/.env",
+    "db:setup": "psql -d risk_assessment_db -f backend/src/database/schema.sql && cd backend && npm run seed",
+    "start": "concurrently \"npm run dev --prefix backend\" \"npm start --prefix frontend\" \"npm run dev --prefix landing\"",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm start --prefix frontend\" \"npm run dev --prefix landing\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeyasuriyaa-j/Saas-RiskAssesment.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jeyasuriyaa-j/Saas-RiskAssesment/issues"
+  },
+  "homepage": "https://github.com/jeyasuriyaa-j/Saas-RiskAssesment#readme",
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.4",
+    "dotenv": "^17.2.3",
+    "form-data": "^4.0.5",
+    "xlsx": "^0.18.5"
+  }
+}

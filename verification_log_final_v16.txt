@@ -1,0 +1,47 @@
+🔍 Starting Audit & Import Verification...
+   (Waiting 60s for Gemini quota to refresh...)
+
+1️⃣  Authenticating...
+   ✅ Authenticated.
+
+2️⃣  Creating Base Risk for "Before/After" test...
+   ✅ Created Risk IMP-TEST-1769679179699 (ID: IMP-TEST-1769679179699)
+
+3️⃣  Preparing Import File...
+   ✅ Created temp_audit_import.xlsx
+
+4️⃣  Uploading Import File...
+   ✅ Job Started: b9627dc4-5c9c-434a-98e4-0cac9327290e
+   Waiting for analysis to complete...
+   ✅ Analysis Done. Clusters: 0
+   ✅ Import Execution Triggered.
+   Waiting for completion...
+   ✅ Import Completed Successfully.
+
+7️⃣  Verifying Requirement: No Data Loss...
+   ✅ PASS: New Risk Created.
+
+8️⃣  Verifying Requirement: Audit Granularity & Before/After...
+
+❌ VERIFICATION FAILED: Request failed with status code 500
+Response: {
+  error: {
+    message: 'Internal Server Error',
+    statusCode: 500,
+    stack: 'error: invalid input syntax for type uuid: "IMP-TEST-1769679179699"\n' +
+      '    at /Users/jeyasuriyaajeyakumar/Desktop/Antigravity/risk-assessment-saas/backend/node_modules/pg/lib/client.js:588:17\n' +
+      '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n' +
+      '    at async query (/Users/jeyasuriyaajeyakumar/Desktop/Antigravity/risk-assessment-saas/backend/dist/database/connection.js:47:24)\n' +
+      '    at async /Users/jeyasuriyaajeyakumar/Desktop/Antigravity/risk-assessment-saas/backend/dist/routes/risk.routes.js:88:20',
+    details: {
+      length: 154,
+      name: 'error',
+      severity: 'ERROR',
+      code: '22P02',
+      where: "unnamed portal parameter $1 = '...'",
+      file: 'uuid.c',
+      line: '136',
+      routine: 'string_to_uuid'
+    }
+  }
+}

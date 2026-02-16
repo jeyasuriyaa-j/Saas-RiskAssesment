@@ -1,0 +1,40 @@
+🔍 Starting Audit & Import Verification...
+   (Waiting 60s for Gemini quota to refresh...)
+
+1️⃣  Authenticating...
+   ✅ Authenticated.
+
+2️⃣  Creating Base Risk for "Before/After" test...
+   ✅ Created Risk IMP-TEST-1769678751316 (ID: RISK-2026-001)
+
+3️⃣  Preparing Import File...
+   ✅ Created temp_audit_import.xlsx
+
+4️⃣  Uploading Import File...
+   ✅ Job Started: 905ef597-a88f-416b-a397-9d657a7b13a6
+   Waiting for analysis to complete...
+   ✅ Analysis Done. Clusters: 0
+   ✅ Import Execution Triggered.
+   Waiting for completion...
+   ✅ Import Completed Successfully.
+
+7️⃣  Verifying Requirement: No Data Loss...
+   ✅ PASS: New Risk Created.
+
+8️⃣  Verifying Requirement: Audit Granularity & Before/After...
+DEBUG: Audit Trail: [
+  {
+    "history_id": "6d1ceeab-04d6-490a-afa6-0b65636ba13f",
+    "risk_id": "6218b63f-f622-4303-8b24-075d9d0a39a3",
+    "changed_by": "1a0badae-cfbc-4815-8fac-c4542f8fe369",
+    "change_type": "created",
+    "field_name": null,
+    "old_value": null,
+    "new_value": "{\"risk_id\":\"6218b63f-f622-4303-8b24-075d9d0a39a3\",\"tenant_id\":\"b6a4ecfd-d012-4eca-8ed0-5c5e3828dd2d\",\"risk_code\":\"RISK-2026-001\",\"statement\":\"Original Risk Statement\",\"description\":\"Causes: undefined. Impacts: undefined\",\"category_id\":null,\"likelihood_score\":null,\"impact_score\":null,\"inherent_risk_score\":null,\"residual_risk_score\":null,\"owner_user_id\":\"1a0badae-cfbc-4815-8fac-c4542f8fe369\",\"department\":null,\"status\":\"DRAFT\",\"priority\":null,\"identified_date\":\"2026-01-29T05:00:00.000Z\",\"last_reviewed_date\":null,\"next_review_date\":null,\"closed_date\":null,\"ai_suggested_score\":null,\"ai_confidence\":null,\"created_by\":\"1a0badae-cfbc-4815-8fac-c4542f8fe369\",\"created_at\":\"2026-01-29T09:26:51.482Z\",\"updated_at\":\"2026-01-29T09:26:51.482Z\",\"custom_fields\":{\"original_status\":\"ACTIVE\"},\"last_reviewed_at\":null,\"next_review_due_at\":null,\"category\":\"SECURITY\"}",
+    "change_reason": "Risk manually created",
+    "changed_at": "2026-01-29T09:26:51.486Z",
+    "changed_by_name": "Audit Tester"
+  }
+]
+
+❌ VERIFICATION FAILED: FAILED: No audit log found for bulk update!

@@ -1,0 +1,232 @@
+﻿{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@mapbox/node-pre-gyp": {
+      "name": "@mapbox/node-pre-gyp",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "tar"
+      ],
+      "effects": [
+        "bcrypt"
+      ],
+      "range": "<=1.0.11",
+      "nodes": [
+        "node_modules/@mapbox/node-pre-gyp"
+      ],
+      "fixAvailable": {
+        "name": "bcrypt",
+        "version": "6.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "axios": {
+      "name": "axios",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1113092,
+          "name": "axios",
+          "dependency": "axios",
+          "title": "Axios is Vulnerable to Denial of Service via __proto__ Key in mergeConfig",
+          "url": "https://github.com/advisories/GHSA-43fc-jf86-j433",
+          "severity": "high",
+          "cwe": [
+            "CWE-754"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<=1.13.4"
+        }
+      ],
+      "effects": [],
+      "range": "<=1.13.4",
+      "nodes": [
+        "node_modules/axios"
+      ],
+      "fixAvailable": true
+    },
+    "bcrypt": {
+      "name": "bcrypt",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@mapbox/node-pre-gyp"
+      ],
+      "effects": [],
+      "range": "5.0.1 - 5.1.1",
+      "nodes": [
+        "node_modules/bcrypt"
+      ],
+      "fixAvailable": {
+        "name": "bcrypt",
+        "version": "6.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "qs": {
+      "name": "qs",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1113161,
+          "name": "qs",
+          "dependency": "qs",
+          "title": "qs's arrayLimit bypass in comma parsing allows denial of service",
+          "url": "https://github.com/advisories/GHSA-w7fw-mjwx-w883",
+          "severity": "low",
+          "cwe": [
+            "CWE-20"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": ">=6.7.0 <=6.14.1"
+        }
+      ],
+      "effects": [],
+      "range": "6.7.0 - 6.14.1",
+      "nodes": [
+        "node_modules/qs"
+      ],
+      "fixAvailable": true
+    },
+    "tar": {
+      "name": "tar",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1112255,
+          "name": "tar",
+          "dependency": "tar",
+          "title": "node-tar is Vulnerable to Arbitrary File Overwrite and Symlink Poisoning via Insufficient Path Sanitization",
+          "url": "https://github.com/advisories/GHSA-8qq5-rm4j-mr97",
+          "severity": "high",
+          "cwe": [
+            "CWE-22"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<=7.5.2"
+        },
+        {
+          "source": 1112329,
+          "name": "tar",
+          "dependency": "tar",
+          "title": "Race Condition in node-tar Path Reservations via Unicode Ligature Collisions on macOS APFS",
+          "url": "https://github.com/advisories/GHSA-r6q2-hw4h-h46w",
+          "severity": "high",
+          "cwe": [
+            "CWE-176"
+          ],
+          "cvss": {
+            "score": 8.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:H/A:L"
+          },
+          "range": "<=7.5.3"
+        },
+        {
+          "source": 1112659,
+          "name": "tar",
+          "dependency": "tar",
+          "title": "node-tar Vulnerable to Arbitrary File Creation/Overwrite via Hardlink Path Traversal",
+          "url": "https://github.com/advisories/GHSA-34x7-hfp2-rc4v",
+          "severity": "high",
+          "cwe": [
+            "CWE-22",
+            "CWE-59"
+          ],
+          "cvss": {
+            "score": 8.2,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:L/A:N"
+          },
+          "range": "<7.5.7"
+        }
+      ],
+      "effects": [
+        "@mapbox/node-pre-gyp"
+      ],
+      "range": "<=7.5.6",
+      "nodes": [
+        "node_modules/tar"
+      ],
+      "fixAvailable": {
+        "name": "bcrypt",
+        "version": "6.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "xlsx": {
+      "name": "xlsx",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1108110,
+          "name": "xlsx",
+          "dependency": "xlsx",
+          "title": "Prototype Pollution in sheetJS",
+          "url": "https://github.com/advisories/GHSA-4r6h-8v6p-xvw6",
+          "severity": "high",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 7.8,
+            "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H"
+          },
+          "range": "<0.19.3"
+        },
+        {
+          "source": 1108111,
+          "name": "xlsx",
+          "dependency": "xlsx",
+          "title": "SheetJS Regular Expression Denial of Service (ReDoS)",
+          "url": "https://github.com/advisories/GHSA-5pgg-2g8v-p4x9",
+          "severity": "high",
+          "cwe": [
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<0.20.2"
+        }
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/xlsx"
+      ],
+      "fixAvailable": false
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 0,
+      "high": 5,
+      "critical": 0,
+      "total": 6
+    },
+    "dependencies": {
+      "prod": 285,
+      "dev": 335,
+      "optional": 12,
+      "peer": 1,
+      "peerOptional": 0,
+      "total": 630
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+    "name": "risk-assessment-frontend",
+    "version": "1.0.0",
+    "description": "AI-powered Risk Assessment SaaS - Frontend",
+    "private": true,
+    "dependencies": {
+        "@emotion/react": "^11.11.3",
+        "@emotion/styled": "^11.11.0",
+        "@mui/icons-material": "^5.15.3",
+        "@mui/material": "^5.15.3",
+        "ajv": "^8.17.1",
+        "axios": "^1.6.5",
+        "date-fns": "^3.0.6",
+        "framer-motion": "^12.34.0",
+        "lucide-react": "^0.563.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-dropzone": "^14.2.3",
+        "react-force-graph-2d": "^1.29.1",
+        "react-router-dom": "^6.21.1",
+        "recharts": "^2.10.3",
+        "xlsx": "^0.18.5"
+    },
+    "devDependencies": {
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@types/node": "^20.10.6",
+        "@types/react": "^18.2.47",
+        "@types/react-dom": "^18.2.18",
+        "autoprefixer": "^10.4.24",
+        "postcss": "^8.5.6",
+        "react-scripts": "5.0.1",
+        "tailwindcss": "^3.4.17",
+        "typescript": "^5.3.3"
+    },
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "proxy": "http://localhost:5000"
+}

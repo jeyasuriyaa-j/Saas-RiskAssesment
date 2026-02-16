@@ -1,0 +1,39 @@
+🔍 Starting Audit & Import Verification...
+
+1️⃣  Authenticating...
+   ✅ Authenticated.
+
+2️⃣  Creating Base Risk for "Before/After" test...
+   ✅ Created Risk IMP-TEST-1769678194047 (ID: RISK-2026-001)
+
+3️⃣  Preparing Import File...
+   ✅ Created temp_audit_import.xlsx
+
+4️⃣  Uploading Import File...
+   ✅ Job Started: 402ce90f-5d93-4a72-9a10-16a4b285afd1
+   Waiting for analysis to complete...
+   ✅ Analysis Done. Clusters: 0
+   ✅ Import Execution Triggered.
+   Waiting for completion...
+   ✅ Import Completed Successfully.
+
+7️⃣  Verifying Requirement: No Data Loss...
+   ✅ PASS: New Risk Created.
+
+8️⃣  Verifying Requirement: Audit Granularity & Before/After...
+DEBUG: Audit Trail: [
+  {
+    "history_id": "09cd1723-6db2-4934-aa17-1edb5cd38d71",
+    "risk_id": "5118c1c3-e293-4bb5-b123-da3ff2b5422f",
+    "changed_by": "397a7858-9ba2-4908-b042-ff179f3eba94",
+    "change_type": "created",
+    "field_name": null,
+    "old_value": null,
+    "new_value": "{\"risk_id\":\"5118c1c3-e293-4bb5-b123-da3ff2b5422f\",\"tenant_id\":\"568a2ba8-252c-4915-9356-d5acf4a5d74a\",\"risk_code\":\"RISK-2026-001\",\"statement\":\"Original Risk Statement\",\"description\":\"Causes: undefined. Impacts: undefined\",\"category_id\":null,\"likelihood_score\":null,\"impact_score\":null,\"inherent_risk_score\":null,\"residual_risk_score\":null,\"owner_user_id\":\"397a7858-9ba2-4908-b042-ff179f3eba94\",\"department\":null,\"status\":\"DRAFT\",\"priority\":null,\"identified_date\":\"2026-01-29T05:00:00.000Z\",\"last_reviewed_date\":null,\"next_review_date\":null,\"closed_date\":null,\"ai_suggested_score\":null,\"ai_confidence\":null,\"created_by\":\"397a7858-9ba2-4908-b042-ff179f3eba94\",\"created_at\":\"2026-01-29T09:16:34.228Z\",\"updated_at\":\"2026-01-29T09:16:34.228Z\",\"custom_fields\":{\"original_status\":\"ACTIVE\"},\"last_reviewed_at\":null,\"next_review_due_at\":null,\"category\":\"SECURITY\"}",
+    "change_reason": "Risk manually created",
+    "changed_at": "2026-01-29T09:16:34.233Z",
+    "changed_by_name": "Audit Tester"
+  }
+]
+
+❌ VERIFICATION FAILED: FAILED: No audit log found for bulk update!

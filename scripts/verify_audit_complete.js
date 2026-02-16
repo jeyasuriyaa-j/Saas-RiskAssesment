@@ -1,0 +1,208 @@
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const FormData = require('form-data');
+const XLSX = require('xlsx');
+
+const API_URL = 'http://localhost:9000/api/v1';
+
+// Test Data
+const TEST_EMAIL = `audit_test_${Date.now()}@example.com`;
+const TEST_PASSWORD = 'Password123!';
+const TEST_RISK_CODE = `IMP-TEST-${Date.now()}`;
+
+async function runVerification() {
+    console.log('🔍 Starting Audit & Import Verification...');
+    console.log('   (Waiting 60s for Gemini quota to refresh...)');
+    await new Promise(r => setTimeout(r, 60000));
+
+    try {
+        // 1. Register/Login Temp User
+        console.log('\n1️⃣  Authenticating...');
+        let token = '';
+        try {
+            const tenantName = `Audit Corp ${Date.now()}`;
+            const regMap = await axios.post(`${API_URL}/auth/register`, {
+                org_name: tenantName,
+                subdomain: `audit-test-${Date.now()}`,
+                admin_name: 'Audit Tester',
+                admin_email: TEST_EMAIL,
+                password: TEST_PASSWORD
+            });
+            token = regMap.data.access_token;
+        } catch (e) {
+            console.log('   Warning: Registration failed:', e.response?.data || e.message);
+            // Login if exists
+            const login = await axios.post(`${API_URL}/auth/login`, {
+                email: TEST_EMAIL,
+                password: TEST_PASSWORD
+            });
+            token = login.data.access_token;
+        }
+        const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+        console.log('   ✅ Authenticated.');
+
+        // 2. Create a "Base Risk" to test Updates
+        console.log('\n2️⃣  Creating Base Risk for "Before/After" test...');
+        const baseRiskRes = await axios.post(`${API_URL}/risks`, {
+            risk_code: TEST_RISK_CODE,
+            statement: 'Original Risk Statement',
+            description: 'Original Description',
+            category: 'SECURITY',
+            likelihood_score: 1,
+            impact_score: 1,
+            status: 'ACTIVE'
+        }, authHeaders);
+        const baseRiskId = baseRiskRes.data.risk.risk_id;
+        console.log(`   ✅ Created Risk ${TEST_RISK_CODE} (ID: ${baseRiskId})`);
+
+        // 3. Prepare Excel File for Import
+        console.log('\n3️⃣  Preparing Import File...');
+        // Row 1: Update existing risk (changing likelihood 1->5)
+        // Row 2: Create new risk
+        const wb = XLSX.utils.book_new();
+        const wsData = [
+            ['Risk Code', 'Statement', 'Description', 'Category', 'Likelihood', 'Impact', 'Priority'], // Headers
+            [TEST_RISK_CODE, 'Original Risk Statement', 'Updated Description', 'SECURITY', 5, 5, 'high'], // Update
+            ['NEW-RISK-001', 'Completely New Risk', 'New Desc', 'OPERATIONAL', 3, 3, 'medium'] // New
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, 'Risks');
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+        fs.writeFileSync('temp_audit_import.xlsx', buffer);
+        console.log('   ✅ Created temp_audit_import.xlsx');
+
+        // 4. Upload & Execute Import
+        console.log('\n4️⃣  Uploading Import File...');
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream('temp_audit_import.xlsx'));
+
+        const uploadRes = await axios.post(`${API_URL}/import/upload`, formData, {
+            headers: { ...authHeaders.headers, ...formData.getHeaders() }
+        });
+        const jobId = uploadRes.data.job_id;
+        console.log(`   ✅ Job Started: ${jobId}`);
+
+        // 5. Wait for Analysis & Confirm Mappings (Trigger Execution)
+        console.log('   Waiting for analysis to complete...');
+        let analysisResult = {};
+        let analysisRetries = 0;
+        while (analysisRetries < 30) {
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                const check = await axios.get(`${API_URL}/import/jobs/${jobId}/results`, authHeaders);
+                analysisResult = check.data;
+                if (analysisResult.column_mapping || (analysisResult.status !== 'processing' && analysisResult.status !== 'analyzing')) break;
+            } catch (err) {
+                // Ignore 400 'Import not yet completed'
+                if (err.response && err.response.status === 400) {
+                    analysisRetries++;
+                    continue;
+                }
+                throw err;
+            }
+            analysisRetries++;
+        }
+        console.log('   ✅ Analysis Done. Clusters:', analysisResult.layout_analysis?.duplicate_clusters?.length || 0);
+
+        const mergeDecisions = {};
+        if (analysisResult.layout_analysis?.duplicate_clusters) {
+            analysisResult.layout_analysis.duplicate_clusters.forEach(c => {
+                mergeDecisions[c.cluster_id] = 'replace_existing';
+            });
+        }
+
+        await axios.post(`${API_URL}/import/jobs/${jobId}/confirm-mapping`, {
+            column_mappings: [
+                { excel_column: 'A', map_to_field: 'risk_code' },
+                { excel_column: 'B', map_to_field: 'statement' },
+                { excel_column: 'C', map_to_field: 'description' },
+                { excel_column: 'D', map_to_field: 'category' },
+                { excel_column: 'E', map_to_field: 'likelihood_score' },
+                { excel_column: 'F', map_to_field: 'impact_score' },
+                { excel_column: 'G', map_to_field: 'priority' }
+            ],
+            merge_decisions: mergeDecisions,
+            import_options: { default_owner_id: baseRiskRes.data.risk.owner_user_id }
+        }, authHeaders);
+        console.log('   ✅ Import Execution Triggered.');
+
+        // 6. Wait for Completion
+        console.log('   Waiting for completion...');
+        let status = 'processing';
+        let jobResult;
+        let retries = 0;
+        while (status !== 'completed' && status !== 'failed' && retries < 20) {
+            await new Promise(r => setTimeout(r, 1000));
+            const check = await axios.get(`${API_URL}/import/jobs/${jobId}/results`, authHeaders);
+            status = check.data.status;
+            jobResult = check.data;
+            retries++;
+        }
+
+        if (status === 'failed') throw new Error(`Import Failed: ${JSON.stringify(jobResult.errors)}`);
+        console.log('   ✅ Import Completed Successfully.');
+
+        // 7. ASSERT REQUIREMENT 1: No Data Loss (New Risk Created)
+        console.log('\n7️⃣  Verifying Requirement: No Data Loss...');
+        const allRisks = await axios.get(`${API_URL}/risks`, authHeaders);
+        const newRisk = allRisks.data.risks.find(r => r.statement === 'Completely New Risk');
+        if (!newRisk) {
+            console.log('DEBUG: Import Job Result:', JSON.stringify(jobResult, null, 2));
+            console.log('DEBUG: All Risks:', JSON.stringify(allRisks.data.risks.map(r => r.statement), null, 2));
+            throw new Error('FAILED: New risk not found!');
+        }
+        console.log('   ✅ PASS: New Risk Created.');
+
+        // 8. ASSERT REQUIREMENT 2 & 3: Audit Logging & Before/After
+        console.log('\n8️⃣  Verifying Requirement: Audit Granularity & Before/After...');
+        const history = await axios.get(`${API_URL}/risks/${baseRiskId}`, authHeaders);
+        const auditTrail = history.data.history;
+
+        const updateLog = auditTrail.find(h => h.change_reason && h.change_reason.includes(jobId) && h.change_type === 'updated');
+
+        if (!updateLog) {
+            console.log('DEBUG: Audit Trail:', JSON.stringify(auditTrail, null, 2));
+            throw new Error('FAILED: No audit log found for bulk update!');
+        }
+        console.log('   ✅ PASS: Audit Log Found for Bulk Update.');
+
+        const oldValue = JSON.parse(updateLog.old_value || '{}');
+        const newValue = JSON.parse(updateLog.new_value || '{}');
+
+        if (oldValue.likelihood_score != 1 || newValue.likelihood_score != 5) {
+            console.log('Old:', oldValue.likelihood_score, 'New:', newValue.likelihood_score);
+            throw new Error('FAILED: Before/After values do not match expected (1 -> 5)');
+        }
+        console.log(`   ✅ PASS: Before/After Comparison Verified (Likelihood: ${oldValue.likelihood_score} -> ${newValue.likelihood_score})`);
+
+        // 9. ASSERT REQUIREMENT 4: Export Audit Trail
+        console.log('\n9️⃣  Verifying Requirement: Export Audit Trail...');
+        const exportRes = await axios.get(`${API_URL}/audit/export`, {
+            ...authHeaders,
+            responseType: 'arraybuffer'
+        });
+
+        if (exportRes.headers['content-type'] !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+            throw new Error('FAILED: Incorrect Content-Type for export');
+        }
+        if (exportRes.data.length < 100) {
+            throw new Error('FAILED: Export file is suspiciously small/empty');
+        }
+        console.log(`   ✅ PASS: Audit Trail Exported (${exportRes.data.length} bytes).`);
+
+        console.log('\n🎉 ALL CHECKS PASSED SUCCESSFULLY!');
+
+        // Cleanup
+        try {
+            fs.unlinkSync('temp_audit_import.xlsx');
+        } catch (e) { }
+
+    } catch (error) {
+        console.error('\n❌ VERIFICATION FAILED:', error.message);
+        if (error.response) console.error('Response:', error.response.data);
+    }
+}
+
+runVerification();

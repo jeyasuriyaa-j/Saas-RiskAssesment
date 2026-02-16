@@ -1,0 +1,6 @@
+Registering...
+
+Received Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4ZDFhZjNlMi1jYTllLTQ2NDItOGMyNy0wOTA5MmFiOWExMGMiLCJ0ZW5hbnRJZCI6IjJkMmQ1YmU1LTdmYTYtNDJmMS04YTAwLTBmM2M0MjVkZDQ1NiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc2OTY3NjA3NCwiZXhwIjoxNzY5Njc2OTc0fQ.HKyMyfhTtzkB3ywFBWUDG8LKVgQeaJvNP5GFIOV8p50
+
+Verifying Token via Health/Profile (if exists)...
+✅ Access Token Valid! Got risks: 0
