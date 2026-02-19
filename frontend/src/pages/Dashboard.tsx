@@ -9,6 +9,7 @@ import {
     Stack,
     LinearProgress,
     alpha,
+    useTheme
 } from '@mui/material';
 import {
     AlertTriangle,
@@ -24,6 +25,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AnimatedCounter from '../components/AnimatedCounter';
 import RiskHeatmap from '../components/RiskHeatmap';
 import RiskNetworkGraph from '../components/RiskNetworkGraph';
+import { useThemeMode } from '../contexts/ThemeModeContext';
 
 interface DashboardData {
     total_risks: number;
@@ -39,6 +41,8 @@ interface DashboardData {
 
 const Dashboard = () => {
     const { user } = useAuth();
+    const { mode } = useThemeMode();
+    const theme = useTheme();
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -74,12 +78,14 @@ const Dashboard = () => {
             <Card
                 className="premium-glass card-glow hover-lift"
                 sx={{
-                    border: 'none',
+                    border: mode === 'dark' ? 'none' : `1px solid ${alpha(iconColor, 0.1)}`,
                     borderRadius: 4,
                     position: 'relative',
                     overflow: 'hidden',
-                    background: `${alpha(iconColor, 0.08)} !important`,
-                    boxShadow: `inset 0 0 20px ${alpha(iconColor, 0.05)}, 0 8px 32px 0 rgba(0, 0, 0, 0.2)`,
+                    background: mode === 'dark' ? `${alpha(iconColor, 0.08)} !important` : `${theme.palette.background.paper} !important`,
+                    boxShadow: mode === 'dark'
+                        ? `inset 0 0 20px ${alpha(iconColor, 0.05)}, 0 8px 32px 0 rgba(0, 0, 0, 0.2)`
+                        : `0 4px 20px 0 ${alpha(iconColor, 0.05)}`,
                 }}
             >
                 <CardContent sx={{ p: 3.5 }}>
@@ -165,8 +171,8 @@ const Dashboard = () => {
                         <Typography variant="overline" sx={{ mb: 1, color: 'primary.main', fontWeight: 900, letterSpacing: 2 }}>
                             Risk Intelligence Platform
                         </Typography>
-                        <Typography variant="h3" fontWeight="900" sx={{ letterSpacing: '-0.04em' }}>
-                            {user?.role === 'viewer' ? 'Executive ' : ''}Analytics <span className="text-gradient-vibrant">Overview</span>
+                        <Typography variant="h3" fontWeight="900" sx={{ letterSpacing: '-0.04em', color: 'text.primary' }}>
+                            {user?.role === 'viewer' ? 'Executive ' : ''}Analytics <span className={mode === 'dark' ? "text-gradient-vibrant" : ""}>Overview</span>
                         </Typography>
                     </Box>
                     <Box sx={{ textAlign: 'right', display: { xs: 'none', md: 'block' } }}>
@@ -221,12 +227,20 @@ const Dashboard = () => {
 
                 {/* Row 2: Full-Width Risk Heatmap (Wider) */}
                 <Grid item xs={12}>
-                    <Box className="premium-glass card-glow" sx={{ p: 4, minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="h6" fontWeight="900" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#f59e0b', 0.1), display: 'flex' }}>
-                                <Zap size={20} style={{ color: '#f59e0b' }} />
-                            </Box>
-                            Risk <span className="text-gradient-gold">Distribution Matrix</span>
+                    <Box className="premium-glass card-glow" sx={{
+                        p: { xs: 2, sm: 3, md: 4 },
+                        minHeight: { xs: '400px', sm: '500px', md: '600px' },
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        <Typography variant="h6" fontWeight="900" sx={{
+                            mb: { xs: 2, md: 3 },
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }
+                        }}>
+                            Risk <span className={mode === 'dark' ? "text-gradient-gold" : ""}>Distribution Matrix</span>
                         </Typography>
                         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
                             <RiskHeatmap />
@@ -235,14 +249,27 @@ const Dashboard = () => {
                 </Grid>
 
                 {/* Row 3: Mid-Tier Visualization & Analytics */}
-                <Grid item xs={12} lg={7}>
-                    <Box className="premium-glass card-glow" sx={{ p: 4, height: '600px', display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="h6" fontWeight="900" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Grid item xs={12} md={12} lg={6}>
+                    <Box className="premium-glass card-glow" sx={{
+                        p: { xs: 2, sm: 3, md: 4 },
+                        height: { xs: 'auto', md: '600px' },
+                        minHeight: { xs: '400px', md: '600px' },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden', // Contain the graph nodes
+                        position: 'relative'
+                    }}>
+                        <Stack direction="row" alignItems="center" spacing={2} mb={{ xs: 2, md: 4 }}>
                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1), display: 'flex' }}>
-                                <Brain size={20} style={{ color: '#8b5cf6' }} />
+                                <Brain size={22} style={{ color: '#8b5cf6' }} />
                             </Box>
-                            Risk <span className="text-gradient-vibrant">Correlation Network</span>
-                        </Typography>
+                            <Box>
+                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' } }}>Analysis</Typography>
+                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }, color: 'text.primary' }}>
+                                    Risk <span className={mode === 'dark' ? "text-gradient-vibrant" : ""}>Correlation Network</span>
+                                </Typography>
+                            </Box>
+                        </Stack>
                         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
                             {user?.role !== 'viewer' && user?.role !== 'auditor' ? (
                                 <RiskNetworkGraph />
@@ -255,15 +282,37 @@ const Dashboard = () => {
                     </Box>
                 </Grid>
 
-                <Grid item xs={12} lg={5}>
-                    <Box className="premium-glass glass-outline card-glow" sx={{ p: 4, height: '600px' }}>
-                        <Stack direction="row" alignItems="center" spacing={2} mb={4}>
+                <Grid item xs={12} md={12} lg={6}>
+                    <Box className="premium-glass glass-outline card-glow" sx={{
+                        p: { xs: 2, sm: 3, md: 4 },
+                        height: { xs: 'auto', md: '600px' },
+                        minHeight: { xs: '400px', md: '600px' },
+                        position: 'relative',
+                        overflow: 'hidden',
+                        zIndex: 2, // Ensure it's above any bleed-out
+                        '&::before': mode === 'dark' ? {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.12) 50%, rgba(4, 120, 87, 0.08) 100%)',
+                            opacity: 0.6,
+                            zIndex: 0
+                        } : {},
+                        '& > *': {
+                            position: 'relative',
+                            zIndex: 1
+                        }
+                    }}>
+                        <Stack direction="row" alignItems="center" spacing={2} mb={{ xs: 2, md: 4 }}>
                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#10b981', 0.1) }}>
                                 <Shield size={22} style={{ color: '#10b981' }} />
                             </Box>
                             <Box>
-                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary' }}>Workflow</Typography>
-                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5 }}>Portfolio Lifecycle</Typography>
+                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' } }}>Workflow</Typography>
+                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' } }}>Portfolio Lifecycle</Typography>
                             </Box>
                         </Stack>
 
@@ -303,15 +352,36 @@ const Dashboard = () => {
                 </Grid>
 
                 {/* Row 4: Detailed Analytics & Strategic Insights */}
-                <Grid item xs={12} md={6}>
-                    <Box className="premium-glass glass-outline card-glow" sx={{ p: 4, height: '100%' }}>
+                <Grid item xs={12} sm={12} md={12} lg={6}>
+                    <Box className="premium-glass glass-outline card-glow" sx={{
+                        p: { xs: 2, sm: 3, md: 4 },
+                        height: { xs: 'auto', md: '450px' },
+                        minHeight: { xs: '350px', md: '450px' },
+                        position: 'relative',
+                        overflow: 'hidden',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.12) 50%, rgba(109, 40, 217, 0.08) 100%)',
+                            opacity: 0.6,
+                            zIndex: 0
+                        },
+                        '& > *': {
+                            position: 'relative',
+                            zIndex: 1
+                        }
+                    }}>
                         <Stack direction="row" alignItems="center" spacing={2} mb={4}>
                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1) }}>
                                 <Zap size={22} style={{ color: '#8b5cf6' }} />
                             </Box>
                             <Box>
-                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary' }}>Aggregation</Typography>
-                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5 }}>Risk Score Analytics</Typography>
+                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' } }}>Aggregation</Typography>
+                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' } }}>Risk Score Analytics</Typography>
                             </Box>
                         </Stack>
 
@@ -367,15 +437,38 @@ const Dashboard = () => {
                     </Box>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
-                    <Box className="premium-glass glass-outline card-glow" sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Grid item xs={12} sm={12} md={12} lg={6}>
+                    <Box className="premium-glass glass-outline card-glow" sx={{
+                        p: { xs: 2, sm: 3, md: 4 },
+                        height: { xs: 'auto', md: '450px' },
+                        minHeight: { xs: '350px', md: '450px' },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.10) 50%, rgba(59, 130, 246, 0.08) 100%)',
+                            opacity: 0.6,
+                            zIndex: 0
+                        },
+                        '& > *': {
+                            position: 'relative',
+                            zIndex: 1
+                        }
+                    }}>
                         <Stack direction="row" alignItems="center" spacing={2} mb={4}>
                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1) }}>
                                 <Brain size={22} style={{ color: '#8b5cf6' }} />
                             </Box>
                             <Box>
-                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary' }}>Strategic</Typography>
-                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5 }}>AI Risk Insights</Typography>
+                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' } }}>Strategic</Typography>
+                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' } }}>AI Risk Insights</Typography>
                             </Box>
                         </Stack>
 
@@ -416,8 +509,27 @@ const Dashboard = () => {
                 </Grid>
 
                 <Grid item xs={12}>
-                    <Box className="premium-glass card-glow" sx={{ p: 4 }}>
-                        <Typography variant="h6" fontWeight="900" sx={{ mb: 4 }}>Top Risk Verticals</Typography>
+                    <Box className="premium-glass card-glow" sx={{
+                        p: { xs: 2, sm: 3, md: 4 },
+                        position: 'relative',
+                        overflow: 'hidden',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.08) 25%, rgba(244, 63, 94, 0.06) 50%, rgba(245, 158, 11, 0.08) 75%, rgba(16, 185, 129, 0.06) 100%)',
+                            opacity: 0.5,
+                            zIndex: 0
+                        },
+                        '& > *': {
+                            position: 'relative',
+                            zIndex: 1
+                        }
+                    }}>
+                        <Typography variant="h6" fontWeight="900" sx={{ mb: { xs: 2, md: 4 }, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' } }}>Top Risk Verticals</Typography>
                         <Grid container spacing={3}>
                             {data.top_risk_categories.map((category) => (
                                 <Grid item xs={12} sm={6} md={3} key={category.category}>
@@ -426,11 +538,11 @@ const Dashboard = () => {
                                         sx={{
                                             p: 3,
                                             borderRadius: 4,
-                                            background: alpha('#ffffff', 0.03),
-                                            border: `1px solid ${alpha('#ffffff', 0.05)}`,
+                                            background: alpha(theme.palette.text.primary, 0.02),
+                                            border: `1px solid ${alpha(theme.palette.text.primary, 0.05)}`,
                                             '&:hover': {
-                                                background: alpha('#ffffff', 0.06),
-                                                borderColor: alpha('#8b5cf6', 0.4),
+                                                background: alpha(theme.palette.primary.main, 0.05),
+                                                borderColor: alpha(theme.palette.primary.main, 0.4),
                                             }
                                         }}
                                     >
@@ -458,7 +570,7 @@ const Dashboard = () => {
                     </Box>
                 </Grid>
             </Grid>
-        </Box>
+        </Box >
     );
 };
 

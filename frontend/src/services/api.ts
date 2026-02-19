@@ -100,8 +100,14 @@ export const usersAPI = {
 export const authAPI = {
     register: (data: any) => api.post('auth/register', data),
     login: (email: string, password: string) => api.post('auth/login', { email, password }),
+    initSSO: (subdomain: string) => api.get(`auth/sso/init/${subdomain}`),
     refresh: (refreshToken: string) => api.post('auth/refresh', { refresh_token: refreshToken }),
     getConfig: () => api.get('auth/config'),
+
+    // MFA
+    mfaVerify: (mfaToken: string, otpCode: string) => api.post('auth/mfa/verify', { mfa_token: mfaToken, otp_code: otpCode }),
+    mfaSetup: () => api.post('auth/mfa/setup'),
+    mfaConfirm: (otpCode: string) => api.post('auth/mfa/confirm', { otp_code: otpCode }),
 };
 
 // Risk API

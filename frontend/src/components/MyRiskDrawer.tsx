@@ -116,7 +116,7 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
         if (score >= 20) return { label: 'CRITICAL', color: 'error' };
         if (score >= 15) return { label: 'HIGH', color: 'warning' };
         if (score >= 10) return { label: 'MEDIUM', color: 'info' };
-        return { label: 'LOW', color: 'default' };
+        return { label: 'LOW', color: 'success' };
     };
 
     return (
@@ -154,23 +154,50 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
                         {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
                         {/* Read-only: Risk Information */}
-                        <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
-                            <Typography variant="overline" color="text.secondary">
-                                Risk Information (Read-only)
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 2.5,
+                                mb: 3,
+                                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.5)' : 'grey.50',
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 3,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                '&::before': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 4,
+                                    bgcolor: 'primary.main'
+                                }
+                            }}
+                        >
+                            <Typography variant="overline" color="primary.main" fontWeight="bold" sx={{ letterSpacing: 1.2 }}>
+                                Risk Context (Read-only)
                             </Typography>
-                            <Box sx={{ mt: 1 }}>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                            <Box sx={{ mt: 1.5 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
                                     {risk.risk_code}
                                 </Typography>
-                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                <Typography variant="h6" sx={{ fontSize: '1.05rem', lineHeight: 1.4, mb: 2 }}>
                                     {risk.statement}
                                 </Typography>
-                                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                                    <Chip label={risk.category} size="small" />
+                                <Stack direction="row" spacing={1}>
+                                    <Chip
+                                        label={risk.category}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ borderColor: 'divider', fontWeight: 600 }}
+                                    />
                                     <Chip
                                         label={getSeverityLabel(risk.inherent_risk_score).label}
                                         color={getSeverityLabel(risk.inherent_risk_score).color as any}
                                         size="small"
+                                        sx={{ fontWeight: 'bold' }}
                                     />
                                 </Stack>
                             </Box>

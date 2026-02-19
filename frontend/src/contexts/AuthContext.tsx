@@ -14,7 +14,11 @@ interface AuthContextType {
     user: User | null;
     token: string | null;
     isAuthenticated: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<{ mfa_required?: boolean; mfa_token?: string }>;
+    verifyMFA: (mfaToken: string, otpCode: string) => Promise<void>;
+    setupMFA: () => Promise<{ qrCodeUrl: string; secret: string }>;
+    confirmMFASetup: (otpCode: string) => Promise<void>;
+    initSSO: (subdomain: string) => Promise<string>;
     register: (data: any) => Promise<void>;
     logout: () => void;
     loading: boolean;
@@ -71,6 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = async (email: string, password: string) => {
         try {
             const response = await authAPI.login(email, password);
+            if (response.data.mfa_required) {
+                return { mfa_required: true, mfa_token: response.data.mfa_token };
+            }
             const { user, access_token, refresh_token } = response.data;
 
             sessionStorage.setItem('access_token', access_token);
@@ -79,6 +86,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             setUser(user);
             await refreshConfig();
+            return {};
+        } catch (error) {
+            throw error;
+        }
+    };
+
+
+
+    const verifyMFA = async (mfaToken: string, otpCode: string) => {
+        try {
+            const response = await authAPI.mfaVerify(mfaToken, otpCode);
+            const { user, access_token, refresh_token } = response.data;
+
+            sessionStorage.setItem('access_token', access_token);
+            sessionStorage.setItem('refresh_token', refresh_token);
+            sessionStorage.setItem('user', JSON.stringify(user));
+
+            setUser(user);
+            await refreshConfig();
+        } catch (error) {
+            throw error;
+        }
+    };
+
+    // WebAuthn and Magic Link removed as per simplification request
+    // registerWebAuthn, loginWebAuthn, requestMagicLink, verifyMagicLink methods removed
+
+    const setupMFA = async () => {
+        const response = await authAPI.mfaSetup();
+        return response.data;
+    };
+
+    const confirmMFASetup = async (otpCode: string) => {
+        await authAPI.mfaConfirm(otpCode);
+    };
+
+    const initSSO = async (subdomain: string) => {
+        try {
+            const response = await authAPI.initSSO(subdomain);
+            return response.data.sso_url;
         } catch (error) {
             throw error;
         }
@@ -119,6 +166,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 token: sessionStorage.getItem('access_token'),
                 isAuthenticated: !!user,
                 login,
+                verifyMFA,
+                setupMFA,
+                confirmMFASetup,
+                initSSO,
                 register,
                 logout,
                 loading,

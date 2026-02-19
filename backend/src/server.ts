@@ -31,6 +31,7 @@ import notificationRoutes from './routes/notification.routes';
 import myRisksRoutes from './routes/my-risks.routes';
 import industryRoutes from './routes/industry.routes';
 import evidenceRoutes from './routes/evidence.routes';
+import ssoRoutes from './routes/sso.routes';
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +74,7 @@ app.get(API_PREFIX, (_req, res) => {
 });
 
 app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/auth`, ssoRoutes);
 app.use(`${API_PREFIX}/remediation`, remediationRoutes);
 app.use(`${API_PREFIX}/risks`, riskRoutes);
 app.use(`${API_PREFIX}/import`, importRoutes);

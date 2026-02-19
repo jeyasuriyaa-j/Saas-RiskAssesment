@@ -136,44 +136,111 @@ router.post('/upload', authorize('admin', 'risk_manager', 'user'), upload.single
         // Trigger AI analysis asynchronously
         (async () => {
             try {
-                // Step 1: Analyze Structure (with AI fallback)
-                let structure: any = { header_row_index: 0 };
+                // Step 1: Fast heuristic sheet selection (no AI needed)
+                // Score each sheet based on its name and how many non-empty rows it has.
+                const RISK_KEYWORDS = ['risk', 'register', 'incident', 'control', 'issue', 'finding', 'audit', 'threat'];
+                const SKIP_KEYWORDS = ['dashboard', 'summary', 'lookup', 'data', 'chart', 'rating', 'table', 'template', 'config', 'read me'];
+
+                let bestSheetName = workbook.SheetNames[0];
+                let bestRawRows = rawRows;
+                let bestScore = -1;
+
+                for (const sName of workbook.SheetNames) {
+                    const sheet = workbook.Sheets[sName];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+                    const nonEmptyRows = rows.filter((r: any[]) => r.some((c: any) => c !== null && c !== undefined && c !== ''));
+
+                    if (nonEmptyRows.length < 2) continue; // Skip blank sheets
+
+                    const lowerName = sName.toLowerCase();
+                    let score = nonEmptyRows.length; // Base score = data density
+
+                    // Boost for risk-related sheet names
+                    if (RISK_KEYWORDS.some(k => lowerName.includes(k))) score += 200;
+                    // Penalize dashboard/support sheets
+                    if (SKIP_KEYWORDS.some(k => lowerName.includes(k))) score -= 100;
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestSheetName = sName;
+                        bestRawRows = rows;
+                    }
+                }
+
+                logger.info(`Job ${job.job_id}: Using sheet "${bestSheetName}" (heuristic score: ${bestScore})`);
+
+                // Step 2: Single AI call on the selected sheet
+                let structure: any = { header_row_index: 0, relevance_score: 100 };
                 try {
-                    structure = await analyzeExcelSheetStructure(rawRows, tenantId);
+                    structure = await analyzeExcelSheetStructure(bestRawRows, tenantId, bestSheetName);
                 } catch (e) {
                     logger.error(`AI structure analysis failed for job ${job.job_id} (using default):`, e);
                 }
 
-                // Space out requests to avoid AI provider rate limits
-                await sleep(2000);
+                // Step 2b: Heuristic override for merged/group header rows
+                // If the AI picked row 0 but that row is sparse (lots of nulls),
+                // scan the first 5 rows and pick the densest one as the actual header.
+                let finalHeaderRowIndex = structure.header_row_index ?? 0;
+                const row0 = bestRawRows[0] as any[];
+                const row0NonNull = row0 ? row0.filter((c: any) => c !== null && c !== undefined && c !== '').length : 0;
+                const row0Total = row0 ? row0.length : 1;
+                const row0Density = row0NonNull / Math.max(row0Total, 1);
 
-                // Extract headers based on detected header row
-                const headerRowIndex = structure.header_row_index ?? 0;
-                const headers = rawRows[headerRowIndex] as string[];
-                const sampleRows = rawRows.slice(headerRowIndex + 1, headerRowIndex + 6);
+                if (finalHeaderRowIndex === 0 && row0Density < 0.5) {
+                    // Row 0 is sparse — likely a merged group header. Find the densest row in first 5.
+                    let bestDensity = row0Density;
+                    for (let i = 1; i < Math.min(5, bestRawRows.length); i++) {
+                        const row = bestRawRows[i] as any[];
+                        if (!row) continue;
+                        const nonNull = row.filter((c: any) => c !== null && c !== undefined && c !== '').length;
+                        const density = nonNull / Math.max(row.length, 1);
+                        if (density > bestDensity) {
+                            bestDensity = density;
+                            finalHeaderRowIndex = i;
+                        }
+                    }
+                    logger.info(`Job ${job.job_id}: Heuristic override — using row ${finalHeaderRowIndex} as header (density: ${bestDensity.toFixed(2)})`);
+                }
+
+                // Extract headers based on the best header row
+                const headerRowIndex = finalHeaderRowIndex;
+                const headers = (bestRawRows[headerRowIndex] as string[]) || [];
+                const sampleRows = bestRawRows.slice(headerRowIndex + 1, headerRowIndex + 6);
 
                 const detectedColumns = headers.map((header, index) => ({
                     excel_column: String.fromCharCode(65 + index),
                     column_name: header,
-                    sample_values: sampleRows.map(row => row[index]).filter(val => val !== undefined && val !== null)
+                    sample_values: sampleRows.map((row: any[]) => row[index]).filter((val: any) => val !== undefined && val !== null)
                 }));
 
-                // Step 2: Update job with structure and proceed
+                const validColumns = detectedColumns.filter(c => c.column_name && c.column_name.toString().trim() !== '');
+
+                // Step 3: Validate and update job
+                if (structure.header_row_index === null || validColumns.length === 0) {
+                    const failReason = structure.header_row_index === null
+                        ? 'AI could not find a header row in this sheet. Please ensure your Excel file has clear column headers (e.g., "Risk Title", "Category").'
+                        : 'No valid data columns detected. The sheet appears to be empty or misformatted.';
+
+                    logger.warn(`Job ${job.job_id}: Import failed - ${failReason}`);
+                    await query(
+                        `UPDATE import_jobs SET status = 'failed', error_log = $1 WHERE job_id = $2`,
+                        [JSON.stringify([{ error: 'Invalid Sheet Structure', details: failReason }]), job.job_id]
+                    );
+                    return;
+                }
+
                 await query(
-                    `UPDATE import_jobs SET layout_analysis = $1 WHERE job_id = $2`,
-                    [JSON.stringify({ ...structure, detected_columns: detectedColumns }), job.job_id]
+                    `UPDATE import_jobs SET layout_analysis = $1, total_rows = $2 WHERE job_id = $3`,
+                    [JSON.stringify({ ...structure, detected_columns: validColumns, selected_sheet: bestSheetName }), bestRawRows.length, job.job_id]
                 );
 
-                // Step 3: AI Column Mapping & Data Quality (Optional AI)
+                // Step 4: AI Column Mapping
                 let aiResponse = null;
                 try {
                     aiResponse = await getExcelMapping(detectedColumns, tenantId, structure);
                 } catch (e) {
                     logger.error(`AI column mapping failed for job ${job.job_id}:`, e);
                 }
-
-                // Space out requests again
-                await sleep(3000);
 
                 // Update job status to 'mapping' IMMEDIATELY so frontend can proceed
                 // We'll do duplicates and validation in background while frontend reviews mapping
@@ -689,7 +756,7 @@ router.post('/jobs/:jobId/analyze-risks', authorize('admin', 'risk_manager', 'us
             const dataRows = rawRows.slice(headerRowIndex + 1);
 
             // Map rows to RiskInput
-            const inputs: RiskInput[] = dataRows.map((row, index) => {
+            const allMapped: RiskInput[] = dataRows.map((row, index) => {
                 const getColVal = (field: string) => {
                     const map = mappings.find((m: any) => m.mapped_to_field === field);
                     if (!map) return null;
@@ -699,13 +766,18 @@ router.post('/jobs/:jobId/analyze-risks', authorize('admin', 'risk_manager', 'us
 
                 return {
                     id: index, // Row index relative to data start
-                    title: getColVal('risk_statement') || getColVal('title') || `Risk ${index + 1}`,
+                    title: getColVal('risk_statement') || getColVal('title') || '',
                     description: getColVal('description') || '',
                     impact: parseInt(getColVal('impact') || '3'),
                     likelihood: parseInt(getColVal('likelihood') || '3'),
                     department: getColVal('category') || getColVal('department') || 'General'
                 };
             });
+
+            // CRITICAL: Filter out empty/placeholder rows — only analyze rows that have a real title.
+            // Empty trailing rows cause the AI to hallucinate placeholder risks like "Risk 2", "Risk 3".
+            const inputs = allMapped.filter(r => r.title && r.title.trim().length > 0);
+            logger.info(`Job ${jobId}: ${dataRows.length} raw rows → ${inputs.length} non-empty rows to analyze.`);
 
             // Bulk insert
             await bulkInsertRisksHighPerf(jobId, tenantId, inputs);
@@ -944,12 +1016,11 @@ async function executeImport(
                     riskData.status = normalizeRiskStatus(riskData.status);
                 }
 
-                // Detect Intra-Excel Duplicates
+                // Detect Intra-Excel Duplicates (track but don't skip — allow override)
                 const riskKey = title.trim().toLowerCase();
                 if (excelRiskTracker.has(riskKey)) {
                     intraExcelDuplicates++;
-                    logger.info(`Skipping intra-excel duplicate row ${i}: ${title}`);
-                    continue;
+                    logger.info(`Intra-excel duplicate row ${i}: ${title} — importing anyway (override mode)`);
                 }
                 excelRiskTracker.add(riskKey);
 
@@ -1009,8 +1080,9 @@ async function executeImport(
 
                 if (clusterId && !strategy) {
                     const strategyInfo = (duplicateReport.merge_strategies || []).find((s: any) => s.cluster_id === clusterId);
-                    strategy = strategyInfo?.recommended_strategy || 'skip_import';
-                    logger.info(`Using AI recommended strategy '${strategy}' for cluster ${clusterId} as no user decision was provided`);
+                    // Default to import_as_new so all rows are always imported
+                    strategy = strategyInfo?.recommended_strategy === 'replace_existing' ? 'replace_existing' : 'import_as_new';
+                    logger.info(`Using strategy '${strategy}' for cluster ${clusterId} (override mode — duplicates always imported)`);
                 }
 
                 if (strategy === 'skip_import') {
@@ -1297,8 +1369,7 @@ async function executeImportWithDecisions(
 
                 if (excelRiskTracker.has(riskKey)) {
                     intraExcelDuplicates++;
-                    logger.info(`Skipping intra-excel duplicate row ${rowIndex}: ${title}`);
-                    continue;
+                    logger.info(`Intra-excel duplicate row ${rowIndex}: ${title} — importing anyway (override mode)`);
                 }
                 excelRiskTracker.add(riskKey);
 
@@ -1381,7 +1452,9 @@ async function executeImportWithDecisions(
                             continue;
                         }
 
-                        if (mergeDecision === 'update') {
+                        // Default behavior: update (override) the existing risk
+                        const shouldUpdate = mergeDecision === 'update' || !mergeDecision;
+                        if (shouldUpdate) {
                             await query(
                                 `UPDATE risks SET
                                     description = COALESCE($1, description),

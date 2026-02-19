@@ -23,6 +23,7 @@ export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         localStorage.setItem('themeMode', mode);
+        document.body.setAttribute('data-theme', mode);
     }, [mode]);
 
     const toggleMode = () => {

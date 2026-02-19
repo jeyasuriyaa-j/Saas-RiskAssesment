@@ -31,7 +31,10 @@ import {
     Card,
     CardContent,
     Grid,
-    Chip
+    Chip,
+    Dialog,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
 import {
     Plus,
@@ -39,7 +42,9 @@ import {
     CheckCircle2,
     Trash2,
     Filter,
-    SlidersHorizontal
+    SlidersHorizontal,
+    MoreVertical,
+    AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { riskAPI } from '../services/api';
@@ -84,10 +89,17 @@ export default function RiskList() {
     const [filterCategory, setFilterCategory] = useState<string>('ALL');
     const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
     const [filterDepartment, setFilterDepartment] = useState<string>('ALL');
+    const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
 
     // Drawer State (Kept for 'new' risk creation if needed, but navigation preferred)
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewingRiskId, setViewingRiskId] = useState<string | null>(null);
+
+    // Row action state
+    const [anchorElRow, setAnchorElRow] = useState<null | HTMLElement>(null);
+    const [activeRisk, setActiveRisk] = useState<Risk | null>(null);
+    const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     // Permission Check
     const role = user?.role?.toLowerCase();
@@ -99,6 +111,13 @@ export default function RiskList() {
     useEffect(() => {
         loadRisks();
     }, []);
+
+    // Enforce "All Risks" for Admins on mount to avoid confusion
+    useEffect(() => {
+        if (canViewAll) {
+            setCurrentTab(0);
+        }
+    }, [canViewAll]);
 
     // Set default tab based on role
     useEffect(() => {
@@ -161,6 +180,13 @@ export default function RiskList() {
         }
         if (filterDepartment !== 'ALL') {
             result = result.filter(r => r.department === filterDepartment || r.department_id === filterDepartment);
+        }
+
+        // Status Filtering
+        if (filterStatus === 'ACTIVE') {
+            result = result.filter(r => r.status !== 'CLOSED');
+        } else if (filterStatus === 'CLOSED') {
+            result = result.filter(r => r.status === 'CLOSED');
         }
 
         // Sorting
@@ -271,6 +297,32 @@ export default function RiskList() {
         }
     };
 
+    const handleDeleteRisk = async (permanent: boolean = false) => {
+        if (!activeRisk) return;
+        setDeleteLoading(true);
+        try {
+            await riskAPI.delete(activeRisk.risk_id, permanent);
+            setOpenDeleteDialog(false);
+            setActiveRisk(null);
+            loadRisks();
+        } catch (error) {
+            console.error('Delete failed:', error);
+            alert('Failed to delete risk.');
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    const handleOpenRowMenu = (event: React.MouseEvent<HTMLElement>, risk: Risk) => {
+        event.stopPropagation();
+        setAnchorElRow(event.currentTarget);
+        setActiveRisk(risk);
+    };
+
+    const handleCloseRowMenu = () => {
+        setAnchorElRow(null);
+    };
+
     return (
         <Box sx={{
             height: 'calc(100vh - 80px)',
@@ -291,7 +343,9 @@ export default function RiskList() {
                 >
                     <Box>
                         <Typography variant="h4" fontWeight="800" sx={{
-                            background: 'linear-gradient(45deg, #fff 30%, #a5b4fc 90%)',
+                            background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(45deg, #fff 30%, #a5b4fc 90%)'
+                                : `linear-gradient(45deg, ${theme.palette.primary.dark} 30%, ${theme.palette.primary.main} 90%)`,
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             letterSpacing: '-0.02em',
@@ -299,7 +353,7 @@ export default function RiskList() {
                         }}>
                             Risk Register
                         </Typography>
-                        <Typography variant="body2" sx={{ color: alpha('#fff', 0.5), mt: 0.5, fontWeight: 500 }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, fontWeight: 500 }}>
                             {filteredRisks.length} active risks portfolio • {filteredRisks.filter(r => r.priority === 'CRITICAL').length} critical items
                         </Typography>
                     </Box>
@@ -340,9 +394,10 @@ export default function RiskList() {
                 alignItems: 'center',
                 flexDirection: isMobile ? 'column' : 'row',
                 gap: 2,
-                background: alpha(theme.palette.background.paper, 0.2),
+                background: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.2 : 0.8),
                 backdropFilter: 'blur(20px)',
-                border: `1px solid ${alpha(theme.palette.common.white, 0.08)}`,
+                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                boxShadow: theme.palette.mode === 'light' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
                 borderRadius: '18px',
                 mx: 0.5,
                 mb: 1
@@ -363,10 +418,10 @@ export default function RiskList() {
                             minWidth: 'auto',
                             px: 2,
                             mr: isMobile ? 0 : 1,
-                            color: alpha('#fff', 0.4),
+                            color: 'text.secondary',
                             '&.Mui-selected': {
-                                color: '#fff',
-                                bgcolor: alpha('#fff', 0.1),
+                                color: 'text.primary',
+                                bgcolor: alpha(theme.palette.text.primary, 0.08),
                             },
                         }
                     }}
@@ -376,7 +431,7 @@ export default function RiskList() {
                     <Tab label={isMobile ? "Mine" : "Assigned"} />
                 </Tabs>
 
-                {!isMobile && <Divider orientation="vertical" flexItem sx={{ borderColor: alpha('#fff', 0.1), my: 0.5 }} />}
+                {!isMobile && <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />}
 
                 <TextField
                     placeholder={isMobile ? "Search..." : "Search risks..."}
@@ -387,16 +442,16 @@ export default function RiskList() {
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
-                                <Search size={16} style={{ color: alpha('#fff', 0.4) }} />
+                                <Search size={16} style={{ color: theme.palette.text.secondary }} />
                             </InputAdornment>
                         ),
                         sx: {
                             borderRadius: '16px',
-                            bgcolor: alpha('#fff', 0.03),
+                            bgcolor: alpha(theme.palette.text.primary, 0.03),
                             '& fieldset': { border: 'none' },
                             fontSize: '0.875rem',
-                            color: '#fff',
-                            '&:hover': { bgcolor: alpha('#fff', 0.05) },
+                            color: 'text.primary',
+                            '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.05) },
                             transition: 'all 0.2s ease'
                         }
                     }}
@@ -411,10 +466,10 @@ export default function RiskList() {
                             size="small"
                             onClick={(e) => setAnchorElFilter(e.currentTarget)}
                             sx={{
-                                bgcolor: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' ? alpha('#6366f1', 0.2) : alpha('#fff', 0.03),
-                                border: `1px solid ${filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' ? alpha('#6366f1', 0.3) : alpha('#fff', 0.08)}`,
+                                bgcolor: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? alpha('#6366f1', 0.15) : alpha(theme.palette.text.primary, 0.04),
+                                border: `1px solid ${filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? alpha('#6366f1', 0.3) : alpha(theme.palette.divider, 0.5)}`,
                                 borderRadius: '10px',
-                                color: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' ? '#818cf8' : alpha('#fff', 0.6)
+                                color: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? '#818cf8' : 'text.secondary'
                             }}
                         >
                             <Filter size={18} />
@@ -425,10 +480,10 @@ export default function RiskList() {
                             size="small"
                             onClick={(e) => setAnchorElSort(e.currentTarget)}
                             sx={{
-                                bgcolor: alpha('#fff', 0.03),
-                                border: `1px solid ${alpha('#fff', 0.08)}`,
+                                bgcolor: alpha(theme.palette.text.primary, 0.04),
+                                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                                 borderRadius: '10px',
-                                color: alpha('#fff', 0.6),
+                                color: 'text.secondary',
                                 p: 1
                             }}
                         >
@@ -437,6 +492,24 @@ export default function RiskList() {
                     </Tooltip>
                 </Stack>
 
+                {/* Clear Filters Button (Visible if any filter is active or search exists) */}
+                {(filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' || search) && (
+                    <Button
+                        size="small"
+                        onClick={() => {
+                            setFilterCategory('ALL');
+                            setFilterSeverity('ALL');
+                            setFilterDepartment('ALL');
+                            setFilterStatus('ACTIVE');
+                            setSearch('');
+                            if (canViewAll) setCurrentTab(0);
+                        }}
+                        sx={{ ml: 1, textTransform: 'none', color: 'text.secondary' }}
+                    >
+                        Clear Filters
+                    </Button>
+                )}
+
                 {/* Filter Menu */}
                 <Menu
                     anchorEl={anchorElFilter}
@@ -444,15 +517,15 @@ export default function RiskList() {
                     onClose={() => setAnchorElFilter(null)}
                     PaperProps={{
                         sx: {
-                            bgcolor: '#1e293b',
-                            border: `1px solid ${alpha('#fff', 0.1)}`,
+                            bgcolor: 'background.paper',
+                            border: `1px solid ${theme.palette.divider}`,
                             borderRadius: '12px',
                             minWidth: 180,
                             mt: 1
                         }
                     }}
                 >
-                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: alpha('#fff', 0.4) }}>Severity</Typography>
+                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Severity</Typography>
                     {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => (
                         <MenuItem
                             key={s}
@@ -462,8 +535,8 @@ export default function RiskList() {
                             <ListItemText primary={s === 'ALL' ? 'All Severities' : s} />
                         </MenuItem>
                     ))}
-                    <Divider sx={{ my: 1, borderColor: alpha('#fff', 0.05) }} />
-                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: alpha('#fff', 0.4) }}>Department</Typography>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Department</Typography>
                     {['ALL', ...Array.from(new Set(risks.filter(r => r.department).map(r => r.department)))].map(d => (
                         <MenuItem
                             key={d}
@@ -473,8 +546,23 @@ export default function RiskList() {
                             <ListItemText primary={d === 'ALL' ? 'All Departments' : d} />
                         </MenuItem>
                     ))}
-                    <Divider sx={{ my: 1, borderColor: alpha('#fff', 0.05) }} />
-                    <MenuItem onClick={() => { setFilterCategory('ALL'); setFilterSeverity('ALL'); setFilterDepartment('ALL'); setAnchorElFilter(null); }}>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Status</Typography>
+                    {[
+                        { id: 'ACTIVE', label: 'Active Risks' },
+                        { id: 'CLOSED', label: 'Closed Risks' },
+                        { id: 'ALL', label: 'All Statuses' }
+                    ].map(s => (
+                        <MenuItem
+                            key={s.id}
+                            onClick={() => { setFilterStatus(s.id); setAnchorElFilter(null); }}
+                            selected={filterStatus === s.id}
+                        >
+                            <ListItemText primary={s.label} />
+                        </MenuItem>
+                    ))}
+                    <Divider sx={{ my: 1 }} />
+                    <MenuItem onClick={() => { setFilterCategory('ALL'); setFilterSeverity('ALL'); setFilterDepartment('ALL'); setFilterStatus('ACTIVE'); setAnchorElFilter(null); }}>
                         <ListItemText primary="Reset Filters" primaryTypographyProps={{ color: 'error' }} />
                     </MenuItem>
                 </Menu>
@@ -486,8 +574,8 @@ export default function RiskList() {
                     onClose={() => setAnchorElSort(null)}
                     PaperProps={{
                         sx: {
-                            bgcolor: '#1e293b',
-                            border: `1px solid ${alpha('#fff', 0.1)}`,
+                            bgcolor: 'background.paper',
+                            border: `1px solid ${theme.palette.divider}`,
                             borderRadius: '12px',
                             minWidth: 180,
                             mt: 1
@@ -523,17 +611,17 @@ export default function RiskList() {
             {isMobile ? (
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', px: 1 }}>
                     {loading ? (
-                        <Box sx={{ py: 10, textAlign: 'center', color: alpha('#fff', 0.3) }}>Loading risks...</Box>
+                        <Box sx={{ py: 10, textAlign: 'center', color: 'text.secondary' }}>Loading risks...</Box>
                     ) : filteredRisks.length === 0 ? (
-                        <Box sx={{ py: 10, textAlign: 'center', color: alpha('#fff', 0.3) }}>No risks identified.</Box>
+                        <Box sx={{ py: 10, textAlign: 'center', color: 'text.secondary' }}>No risks identified.</Box>
                     ) : (
                         <Grid container spacing={2}>
                             {filteredRisks.map((risk) => (
                                 <Grid item xs={12} key={risk.risk_id}>
                                     <Card
                                         sx={{
-                                            background: alpha(theme.palette.background.paper, 0.1),
-                                            border: `1px solid ${alpha('#fff', 0.05)}`,
+                                            background: 'background.paper',
+                                            border: `1px solid ${theme.palette.divider}`,
                                             borderRadius: 3
                                         }}
                                         onClick={() => handleRowClick(risk.risk_id)}
@@ -541,7 +629,7 @@ export default function RiskList() {
                                         <CardContent>
                                             <Stack spacing={2}>
                                                 <Box display="flex" justifyContent="space-between" alignItems="center">
-                                                    <Typography variant="caption" sx={{ fontFamily: 'monospace', color: alpha('#fff', 0.4) }}>
+                                                    <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
                                                         {risk.risk_code}
                                                     </Typography>
                                                     <Box sx={{
@@ -554,7 +642,7 @@ export default function RiskList() {
                                                         Score: {risk.inherent_risk_score?.toFixed(1)}
                                                     </Box>
                                                 </Box>
-                                                <Typography variant="subtitle1" fontWeight={700} color="white">
+                                                <Typography variant="subtitle1" fontWeight={700} color="text.primary">
                                                     {risk.statement}
                                                 </Typography>
                                                 <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -600,35 +688,36 @@ export default function RiskList() {
                     mx: 0,
                     mb: 0,
                     '&::-webkit-scrollbar': { width: 6, height: 6 },
-                    '&::-webkit-scrollbar-thumb': { background: alpha('#fff', 0.1), borderRadius: 10 },
+                    '&::-webkit-scrollbar-thumb': { background: alpha(theme.palette.text.primary, 0.15), borderRadius: 10 },
                     '&::-webkit-scrollbar-track': { background: 'transparent' }
                 }}>
                     <Table stickyHeader size="small">
                         <TableHead>
                             <TableRow>
-                                <TableCell padding="checkbox" sx={{ bgcolor: alpha('#0f172a', 0.9), borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>
+                                <TableCell padding="checkbox" sx={{ bgcolor: 'background.paper' }}>
                                     <Checkbox
                                         size="small"
                                         indeterminate={selectedRisks.length > 0 && selectedRisks.length < filteredRisks.length}
                                         checked={filteredRisks.length > 0 && selectedRisks.length === filteredRisks.length}
                                         onChange={(e) => handleSelectAll(e.target.checked)}
-                                        sx={{ color: alpha('#fff', 0.3), '&.Mui-checked': { color: '#6366f1' } }}
+                                        sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                                     />
                                 </TableCell>
-                                <TableCell sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>ID</TableCell>
-                                <TableCell sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>Risk Statement</TableCell>
-                                <TableCell sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>Department</TableCell>
-                                <TableCell sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>Owner</TableCell>
-                                <TableCell sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>Severity</TableCell>
-                                <TableCell sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${alpha('#fff', 0.05)}` }}>Status</TableCell>
-                                <TableCell align="right" sx={{ bgcolor: alpha('#0f172a', 0.9), color: alpha('#fff', 0.4), fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: `1px solid ${alpha('#fff', 0.05)}`, pr: 3 }}>Score</TableCell>
+                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID</TableCell>
+                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Risk Statement</TableCell>
+                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Department</TableCell>
+                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Owner</TableCell>
+                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Severity</TableCell>
+                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</TableCell>
+                                <TableCell align="right" sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Score</TableCell>
+                                <TableCell align="center" sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: 60 }}></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? (
-                                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 10, color: alpha('#fff', 0.3) }}>Loading risks...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 10, color: 'text.secondary' }}>Loading risks...</TableCell></TableRow>
                             ) : filteredRisks.length === 0 ? (
-                                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 10, color: alpha('#fff', 0.3) }}>No risks identified.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 10, color: 'text.secondary' }}>No risks identified.</TableCell></TableRow>
                             ) : (
                                 <AnimatePresence>
                                     {filteredRisks.map((risk, index) => (
@@ -644,16 +733,15 @@ export default function RiskList() {
                                             sx={{
                                                 cursor: 'pointer',
                                                 transition: 'all 0.15s ease-in-out',
-                                                bgcolor: index % 2 !== 0 ? alpha('#fff', 0.01) : 'transparent',
+                                                bgcolor: index % 2 !== 0 ? alpha(theme.palette.text.primary, 0.02) : 'transparent',
                                                 '&:hover': {
                                                     bgcolor: alpha('#6366f1', 0.06),
                                                     '& td': { borderColor: alpha('#6366f1', 0.1) },
                                                     boxShadow: 'inset 0 0 15px rgba(99, 102, 241, 0.05)'
                                                 },
-                                                height: 48, // Slightly taller rows
+                                                height: 48,
                                                 '& td': {
                                                     py: 1, px: 2,
-                                                    borderColor: alpha('#fff', 0.05),
                                                     fontSize: '0.875rem'
                                                 }
                                             }}
@@ -663,17 +751,17 @@ export default function RiskList() {
                                                     size="small"
                                                     checked={selectedRisks.includes(risk.risk_id)}
                                                     onChange={() => handleSelectRisk(risk.risk_id)}
-                                                    sx={{ color: alpha('#fff', 0.3), '&.Mui-checked': { color: '#6366f1' } }}
+                                                    sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                                                 />
                                             </TableCell>
-                                            <TableCell sx={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: alpha('#fff', 0.4), fontWeight: 600 }}>
+                                            <TableCell sx={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: 'text.secondary', fontWeight: 600 }}>
                                                 {risk.risk_code}
                                             </TableCell>
-                                            <TableCell sx={{ color: '#fff', fontWeight: 600, maxWidth: 350 }}>
+                                            <TableCell sx={{ color: 'text.primary', fontWeight: 600, maxWidth: 350 }}>
                                                 {risk.statement}
                                             </TableCell>
                                             <TableCell>
-                                                <Typography variant="body2" sx={{ color: alpha('#fff', 0.6), fontWeight: 500 }}>
+                                                <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                                                     {risk.department || '-'}
                                                 </Typography>
                                             </TableCell>
@@ -688,7 +776,7 @@ export default function RiskList() {
                                                     }}>
                                                         {risk.owner_name?.charAt(0)}
                                                     </Avatar>
-                                                    <Typography variant="body2" sx={{ color: alpha('#fff', 0.6), fontSize: '0.85rem', fontWeight: 500 }}>
+                                                    <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem', fontWeight: 500 }}>
                                                         {risk.owner_name?.split(' ')[0]}
                                                     </Typography>
                                                 </Stack>
@@ -738,7 +826,7 @@ export default function RiskList() {
                                                     );
                                                 })()}
                                             </TableCell>
-                                            <TableCell align="right" sx={{ pr: 3 }}>
+                                            <TableCell align="right">
                                                 <Typography sx={{
                                                     color: getRiskScoreColor(risk.inherent_risk_score),
                                                     fontWeight: 800, fontSize: '1rem',
@@ -747,6 +835,11 @@ export default function RiskList() {
                                                 }}>
                                                     {risk.inherent_risk_score ? risk.inherent_risk_score.toFixed(1) : '-'}
                                                 </Typography>
+                                            </TableCell>
+                                            <TableCell onClick={(e) => e.stopPropagation()}>
+                                                <IconButton size="small" onClick={(e) => handleOpenRowMenu(e, risk)}>
+                                                    <MoreVertical size={16} />
+                                                </IconButton>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -762,14 +855,14 @@ export default function RiskList() {
                 <Paper elevation={0} sx={{
                     position: 'fixed', bottom: 40, left: '50%', transform: 'translateX(-50%)',
                     px: 3, py: 1.2, borderRadius: '100px', display: 'flex', alignItems: 'center', gap: 2,
-                    background: alpha('#0f172a', 0.8), backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)', zIndex: 1100
+                    background: alpha(theme.palette.background.paper, 0.95), backdropFilter: 'blur(16px)',
+                    border: `1px solid ${theme.palette.divider}`,
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.2)', zIndex: 1100
                 }}>
-                    <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.875rem' }}>
+                    <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.875rem' }}>
                         {selectedRisks.length} Selected
                     </Typography>
-                    <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+                    <Divider orientation="vertical" flexItem />
                     <Stack direction="row" spacing={1}>
                         <Button size="small" variant="text" sx={{ color: '#22c55e', fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: alpha('#22c55e', 0.1) } }} startIcon={<CheckCircle2 size={16} />} onClick={handleBulkApprove}>Approve</Button>
                         <Button size="small" variant="text" sx={{ color: '#ef4444', fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: alpha('#ef4444', 0.1) } }} startIcon={<Trash2 size={16} />} onClick={handleBulkDelete}>Delete</Button>
@@ -786,10 +879,10 @@ export default function RiskList() {
                 PaperProps={{
                     sx: {
                         width: 800, maxWidth: '90vw',
-                        background: alpha('#0f172a', 0.95),
+                        bgcolor: 'background.paper',
                         backdropFilter: 'blur(20px)',
-                        borderLeft: '1px solid rgba(255,255,255,0.1)',
-                        boxShadow: '-20px 0 50px rgba(0,0,0,0.5)'
+                        borderLeft: `1px solid ${theme.palette.divider}`,
+                        boxShadow: '-20px 0 50px rgba(0,0,0,0.2)'
                     }
                 }}
             >
@@ -799,6 +892,73 @@ export default function RiskList() {
                     </Box>
                 )}
             </Drawer>
+
+            {/* ROW ACTIONS MENU */}
+            <Menu
+                anchorEl={anchorElRow}
+                open={Boolean(anchorElRow)}
+                onClose={handleCloseRowMenu}
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'background.paper',
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: '12px',
+                        minWidth: 150,
+                        mt: 0.5,
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                    }
+                }}
+            >
+                <MenuItem onClick={() => { activeRisk && handleRowClick(activeRisk.risk_id); handleCloseRowMenu(); }}>
+                    <ListItemText primary="View Details" />
+                </MenuItem>
+                <MenuItem
+                    onClick={() => { setOpenDeleteDialog(true); handleCloseRowMenu(); }}
+                    sx={{ color: 'error.main' }}
+                    disabled={user?.role === 'viewer' || user?.role === 'auditor'}
+                >
+                    <ListItemText primary="Delete Risk" />
+                </MenuItem>
+            </Menu>
+
+            {/* DELETE CONFIRMATION DIALOG */}
+            <Dialog open={openDeleteDialog} onClose={() => !deleteLoading && setOpenDeleteDialog(false)}>
+                <header style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: '12px', color: theme.palette.error.main }}>
+                    <AlertTriangle size={24} />
+                    <Typography variant="h6" fontWeight="700">Confirm Deletion</Typography>
+                </header>
+                <DialogContent sx={{ mt: 1 }}>
+                    <Typography>
+                        Are you sure you want to delete risk <strong>{activeRisk?.risk_code}</strong>?
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Soft delete will close the risk, while permanent delete will remove it from the system.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 1 }}>
+                    <Button onClick={() => setOpenDeleteDialog(false)} disabled={deleteLoading}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={() => handleDeleteRisk(false)}
+                        color="error"
+                        variant="outlined"
+                        disabled={deleteLoading}
+                    >
+                        Soft Delete
+                    </Button>
+                    {user?.role === 'admin' && (
+                        <Button
+                            onClick={() => handleDeleteRisk(true)}
+                            color="error"
+                            variant="contained"
+                            disabled={deleteLoading}
+                        >
+                            Permanent Delete
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

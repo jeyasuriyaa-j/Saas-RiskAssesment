@@ -110,7 +110,7 @@ export default function IncidentDetail() {
             <Grid container spacing={3}>
                 {/* Incident Overview */}
                 <Grid item xs={12} md={5}>
-                    <Paper sx={{ p: 3, height: '100%', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <Paper sx={{ p: 3, height: '100%', border: '1px solid', borderColor: 'divider' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                             <Typography variant="h5" fontWeight="bold">{event.event_name}</Typography>
                             <Chip
@@ -196,7 +196,7 @@ export default function IncidentDetail() {
 
                             <List>
                                 {assessment.affected_risks.map((risk: any) => (
-                                    <Card key={risk.risk_id} sx={{ mb: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <Card key={risk.risk_id} sx={{ mb: 2, border: '1px solid', borderColor: 'divider' }}>
                                         <CardContent>
                                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
                                                 <Typography variant="subtitle1" fontWeight="bold">
@@ -221,7 +221,7 @@ export default function IncidentDetail() {
                             </List>
                         </Box>
                     ) : !analyzing && (
-                        <Paper sx={{ p: 5, textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                        <Paper sx={{ p: 5, textAlign: 'center', bgcolor: 'action.hover', border: '1px dashed', borderColor: 'divider' }}>
                             <Assessment sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
                             <Typography variant="h6" color="text.secondary">
                                 No Analysis Available

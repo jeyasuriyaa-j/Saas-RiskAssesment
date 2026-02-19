@@ -13,7 +13,7 @@ router.use(authenticate);
  * Get Settings for Current Tenant
  * GET /admin/config
  */
-router.get('/config', authorize('admin', 'risk_manager'), asyncHandler(async (_req: AuthRequest, res: Response) => {
+router.get('/config', authorize('admin'), asyncHandler(async (_req: AuthRequest, res: Response) => {
 
     const configResult = await query(
         'SELECT key, value FROM system_config WHERE key IN ($1, $2, $3)',
@@ -43,7 +43,7 @@ router.get('/config', authorize('admin', 'risk_manager'), asyncHandler(async (_r
  * Update Settings for Current Tenant
  * PUT /admin/config
  */
-router.put('/config', authorize('admin', 'risk_manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.put('/config', authorize('admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId, userId, email } = req.user!;
     const { risk_appetite, scales, language_preference, ai_features, api_key, model } = req.body;
 
@@ -105,7 +105,7 @@ router.put('/config', authorize('admin', 'risk_manager'), asyncHandler(async (re
  * Get Audit Logs for Tenant Configuration
  * GET /admin/audit
  */
-router.get('/audit', authorize('admin', 'risk_manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/audit', authorize('admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId, role } = req.user!;
     const { limit = 50, user_id, action, tenant_id } = req.query; // Filters
 
@@ -159,7 +159,7 @@ router.get('/audit', authorize('admin', 'risk_manager'), asyncHandler(async (req
  * Get Tenant Config (Aligned with User Spec)
  * GET /admin/tenants/{tenantId}/config
  */
-router.get('/tenants/:tenantId/config', authorize('admin', 'risk_manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/tenants/:tenantId/config', authorize('admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId } = req.params;
 
     const result = await query(
@@ -195,7 +195,7 @@ router.get('/tenants/:tenantId/config', authorize('admin', 'risk_manager'), asyn
  * Update Tenant Config (Aligned with User Spec)
  * PUT /admin/tenants/{tenantId}/config
  */
-router.put('/tenants/:tenantId/config', authorize('admin', 'risk_manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.put('/tenants/:tenantId/config', authorize('admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId } = req.params;
     const updatePayload = req.body;
 

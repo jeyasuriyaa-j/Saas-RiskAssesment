@@ -71,6 +71,8 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
     // AI Remediation
     const [aiRemediationLoading, setAiRemediationLoading] = useState(false);
     const [remediationPlans, setRemediationPlans] = useState<any[]>([]);
+    const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     // Task Assignment State
     const [openAssignDialog, setOpenAssignDialog] = useState(false);
@@ -138,7 +140,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
             setRisk((prev: any) => prev ? { ...prev, analysis: response.data.analysis } : null);
         } catch (err: any) {
             console.error('AI Analysis Error:', err);
-            setError('AI Analysis failed. See console for details.');
+            // Don't show a blocking error banner - the UI shows 'Analysis unavailable' info message instead
         } finally {
             setAnalyzing(false);
         }
@@ -156,6 +158,24 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
             }
         } catch (err) {
             setError('Failed to save risk');
+        }
+    };
+
+    const handleDelete = async (permanent: boolean = false) => {
+        if (!riskId || riskId === 'new') return;
+        setDeleteLoading(true);
+        try {
+            await riskAPI.delete(riskId, permanent);
+            setOpenDeleteDialog(false);
+            if (onClose) {
+                onClose();
+            } else {
+                navigate('/risks');
+            }
+        } catch (err) {
+            setError('Failed to delete risk');
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -434,7 +454,17 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                         {riskId === 'new' ? 'Discard & Return' : 'Back to Register'}
                     </Button>
                 )}
-                <Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    {!isEditing && riskId !== 'new' && (
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={() => setOpenDeleteDialog(true)}
+                            disabled={user?.role === 'viewer' || user?.role === 'auditor'}
+                        >
+                            Delete Risk
+                        </Button>
+                    )}
                     {!isEditing ? (
                         <Button variant="contained" onClick={() => setIsEditing(true)}>Edit Risk</Button>
                     ) : (
@@ -616,7 +646,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                                             variant="outlined"
                                             startIcon={<Refresh />}
                                             onClick={() => handleRunAnalysis(true)}
-                                            sx={{ borderRadius: '100px', borderColor: alpha('#6366f1', 0.3), color: alpha('#fff', 0.8) }}
+                                            sx={{ borderRadius: '100px', borderColor: alpha('#6366f1', 0.3), color: 'text.primary' }}
                                         >
                                             {deepAnalysis ? 'Re-run AI' : 'Run Analysis'}
                                         </Button>
@@ -634,18 +664,18 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                             ) : deepAnalysis ? (
                                 <Fade in={true}>
                                     <Box>
-                                        <Box sx={{ mb: 3, p: 2, bgcolor: alpha('#fff', 0.02), borderRadius: '16px', border: `1px solid ${alpha('#fff', 0.05)}` }}>
+                                        <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: '16px', border: `1px solid ${alpha('#6366f1', 0.1)}` }}>
                                             <Typography variant="subtitle2" sx={{ color: '#6366f1', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 <AutoAwesome fontSize="small" /> ENHANCED DESCRIPTION
                                             </Typography>
-                                            <Typography variant="body2" sx={{ lineHeight: 1.6, color: isDrawer ? alpha('#fff', 0.8) : 'text.primary' }}>
+                                            <Typography variant="body2" sx={{ lineHeight: 1.6, color: 'text.primary' }}>
                                                 {deepAnalysis.enhancedDescription}
                                             </Typography>
                                         </Box>
 
                                         <Grid container spacing={2} sx={{ mb: 3 }}>
                                             <Grid item xs={12} md={6}>
-                                                <Box sx={{ p: 2, height: '100%', bgcolor: alpha('#fff', 0.02), borderRadius: '16px', border: `1px solid ${alpha('#fff', 0.05)}` }}>
+                                                <Box sx={{ p: 2, height: '100%', bgcolor: 'action.hover', borderRadius: '16px', border: `1px solid ${alpha('#ef4444', 0.15)}` }}>
                                                     <Typography variant="subtitle2" sx={{ color: '#ef4444', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                                         <Assessment fontSize="small" /> IMPACT
                                                     </Typography>
@@ -653,7 +683,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                                                 </Box>
                                             </Grid>
                                             <Grid item xs={12} md={6}>
-                                                <Box sx={{ p: 2, height: '100%', bgcolor: alpha('#fff', 0.02), borderRadius: '16px', border: `1px solid ${alpha('#fff', 0.05)}` }}>
+                                                <Box sx={{ p: 2, height: '100%', bgcolor: 'action.hover', borderRadius: '16px', border: `1px solid ${alpha('#fbbf24', 0.15)}` }}>
                                                     <Typography variant="subtitle2" sx={{ color: '#fbbf24', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                                         <Shield fontSize="small" /> LIKELIHOOD
                                                     </Typography>
@@ -1166,6 +1196,43 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                     >
                         {assignLoading ? 'Assigning...' : 'Assign Task'}
                     </Button>
+                </DialogActions>
+            </Dialog>
+            {/* DELETE CONFIRMATION DIALOG */}
+            <Dialog open={openDeleteDialog} onClose={() => !deleteLoading && setOpenDeleteDialog(false)}>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
+                    <Warning color="error" /> Delete Risk
+                </DialogTitle>
+                <DialogContent>
+                    <Typography gutterBottom>
+                        Are you sure you want to delete risk <strong>{risk.risk_code}</strong>?
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        By default, this will set the risk status to 'CLOSED' and keep it in the history.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 0 }}>
+                    <Button onClick={() => setOpenDeleteDialog(false)} disabled={deleteLoading}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={() => handleDelete(false)}
+                        color="error"
+                        variant="outlined"
+                        disabled={deleteLoading}
+                    >
+                        Soft Delete (Close)
+                    </Button>
+                    {user?.role === 'admin' && (
+                        <Button
+                            onClick={() => handleDelete(true)}
+                            color="error"
+                            variant="contained"
+                            disabled={deleteLoading}
+                        >
+                            Permanent Delete
+                        </Button>
+                    )}
                 </DialogActions>
             </Dialog>
         </Box>

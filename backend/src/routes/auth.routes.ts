@@ -5,6 +5,15 @@ import { query } from '../database/connection';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { authenticate } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { TOTP } from 'otplib';
+import { NobleCryptoPlugin } from '@otplib/plugin-crypto-noble';
+import { ScureBase32Plugin } from '@otplib/plugin-base32-scure';
+import * as qrcode from 'qrcode';
+
+const totp = new TOTP({
+    crypto: new NobleCryptoPlugin(),
+    base32: new ScureBase32Plugin()
+});
 
 const router = Router();
 
@@ -195,6 +204,25 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
         [user.user_id]
     );
 
+    // Check if MFA is enabled
+    if (user.mfa_enabled) {
+        const mfa_token = jwt.sign(
+            { userId: user.user_id, tenantId: user.tenant_id, partial: true },
+            process.env.JWT_SECRET as string,
+            { expiresIn: '5m' }
+        );
+
+        return res.json({
+            mfa_required: true,
+            mfa_token,
+            user: {
+                user_id: user.user_id,
+                email: user.email,
+                full_name: user.full_name
+            }
+        });
+    }
+
     // Generate JWT tokens
     const access_token = jwt.sign(
         { userId: user.user_id, tenantId: user.tenant_id, role: user.role },
@@ -210,7 +238,7 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
 
     logger.info(`User logged in: ${user.email}`);
 
-    res.json({
+    return res.json({
         message: 'Login successful',
         user: {
             user_id: user.user_id,
@@ -225,6 +253,102 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
         refresh_token
     });
 }));
+
+
+
+// MFA Verification
+router.post('/mfa/verify', asyncHandler(async (req: Request, res: Response) => {
+    const { mfa_token, otp_code } = req.body;
+
+    if (!mfa_token || !otp_code) {
+        throw new AppError('MFA token and code are required', 400);
+    }
+
+    try {
+        const decoded = jwt.verify(mfa_token, process.env.JWT_SECRET!) as any;
+        if (!decoded.partial) throw new Error('Invalid token');
+
+        const result = await query(
+            'SELECT user_id, tenant_id, role, mfa_secret FROM users WHERE user_id = $1',
+            [decoded.userId]
+        );
+
+        const user = result.rows[0];
+        const isValid = await totp.verify(otp_code, {
+            secret: user.mfa_secret
+        });
+
+        if (!isValid.valid) {
+            throw new AppError('Invalid MFA code', 401);
+        }
+
+        // Generate final tokens
+        const access_token = jwt.sign(
+            { userId: user.user_id, tenantId: user.tenant_id, role: user.role },
+            process.env.JWT_SECRET as string,
+            { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any }
+        );
+
+        const refresh_token = jwt.sign(
+            { userId: user.user_id, tenantId: user.tenant_id },
+            process.env.JWT_REFRESH_SECRET as string,
+            { expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any }
+        );
+
+        res.json({
+            access_token,
+            refresh_token,
+            user: {
+                user_id: user.user_id,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        throw new AppError('MFA verification failed', 401);
+    }
+}));
+
+// Setup MFA
+router.post('/mfa/setup', authenticate as any, asyncHandler(async (req: any, res: Response) => {
+    const secret = totp.generateSecret();
+    const otpauth = totp.toURI({
+        label: req.user.email,
+        issuer: 'SWOT Risk',
+        secret
+    });
+
+    const qrCodeUrl = await qrcode.toDataURL(otpauth);
+
+    // Store secret temporarily (don't enable yet)
+    await query(
+        'UPDATE users SET mfa_secret = $1 WHERE user_id = $2',
+        [secret, req.user.userId]
+    );
+
+    res.json({ secret, qrCodeUrl });
+}));
+
+// Confirm MFA Setup
+router.post('/mfa/confirm', authenticate as any, asyncHandler(async (req: any, res: Response) => {
+    const { otp_code } = req.body;
+
+    const result = await query('SELECT mfa_secret FROM users WHERE user_id = $1', [req.user.userId]);
+    const secret = result.rows[0].mfa_secret;
+
+    const isValid = await totp.verify(otp_code, {
+        secret
+    });
+
+    if (!isValid.valid) {
+        throw new AppError('Invalid verification code', 400);
+    }
+
+    await query('UPDATE users SET mfa_enabled = TRUE WHERE user_id = $1', [req.user.userId]);
+
+    res.json({ message: 'MFA enabled successfully' });
+}));
+
+
 
 // Refresh token
 router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {

@@ -101,10 +101,11 @@ const ChatWidget: React.FC = () => {
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
-                        background: 'rgba(13, 33, 55, 0.95)',
+                        background: 'background.paper',
                         backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(0, 212, 255, 0.2)',
-                        boxShadow: '0 12px 48px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        boxShadow: '0 12px 48px rgba(0, 0, 0, 0.2)',
                         zIndex: 1000
                     }}
                 >
@@ -119,12 +120,12 @@ const ChatWidget: React.FC = () => {
                                 <Typography variant="caption" color="text.secondary">AI-Powered Insights</Typography>
                             </Box>
                         </Stack>
-                        <IconButton size="small" onClick={() => setIsOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <IconButton size="small" onClick={() => setIsOpen(false)} sx={{ color: 'text.secondary' }}>
                             <CloseIcon fontSize="small" />
                         </IconButton>
                     </Box>
 
-                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                    <Divider sx={{ borderColor: 'divider' }} />
 
                     {/* Messages Container */}
                     <Box sx={{ flex: 1, p: 2, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -140,11 +141,12 @@ const ChatWidget: React.FC = () => {
                                     <Box sx={{
                                         p: 1.5,
                                         borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                                        bgcolor: msg.role === 'user' ? 'primary.main' : 'rgba(255,255,255,0.05)',
-                                        background: msg.role === 'user' ? 'linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%)' : 'rgba(255,255,255,0.05)',
-                                        border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                                        bgcolor: msg.role === 'user' ? 'primary.main' : 'action.hover',
+                                        background: msg.role === 'user' ? 'linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%)' : undefined,
+                                        border: msg.role === 'user' ? 'none' : '1px solid',
+                                        borderColor: msg.role === 'user' ? undefined : 'divider',
                                     }}>
-                                        <Typography variant="body2" sx={{ color: '#fff', lineHeight: 1.5 }}>
+                                        <Typography variant="body2" sx={{ color: msg.role === 'user' ? '#fff' : 'text.primary', lineHeight: 1.5 }}>
                                             {msg.content}
                                         </Typography>
                                     </Box>
@@ -152,7 +154,7 @@ const ChatWidget: React.FC = () => {
                             </Fade>
                         ))}
                         {loading && (
-                            <Box sx={{ alignSelf: 'flex-start', p: 1, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{ alignSelf: 'flex-start', p: 1, bgcolor: 'action.hover', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <CircularProgress size={12} color="primary" />
                                 <Typography variant="caption" color="text.secondary">AI is thinking...</Typography>
                             </Box>
@@ -161,7 +163,7 @@ const ChatWidget: React.FC = () => {
                     </Box>
 
                     {/* Input Area */}
-                    <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)' }}>
+                    <Box sx={{ p: 2, bgcolor: 'action.hover' }}>
                         <TextField
                             fullWidth
                             size="small"
@@ -183,9 +185,9 @@ const ChatWidget: React.FC = () => {
                                 ),
                                 sx: {
                                     borderRadius: '12px',
-                                    bgcolor: 'rgba(255,255,255,0.03)',
-                                    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                                    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                                    bgcolor: 'action.hover',
+                                    '& fieldset': { borderColor: 'divider' },
+                                    '&:hover fieldset': { borderColor: 'text.secondary' },
                                     '&.Mui-focused fieldset': { borderColor: '#00d4ff' }
                                 }
                             }}

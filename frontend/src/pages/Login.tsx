@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     Container,
@@ -16,6 +16,8 @@ import {
 import {
     Email,
     Lock,
+    Business as BusinessIcon,
+    VpnKey as VpnKeyIcon,
     Visibility,
     VisibilityOff,
     Login as LoginIcon,
@@ -25,17 +27,36 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useThemeMode } from '../contexts/ThemeModeContext';
 import InteractiveBackground from '../components/InteractiveBackground';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    CircularProgress,
+} from '@mui/material';
 
 export default function Login() {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, initSSO, verifyMFA } = useAuth();
     const [email, setEmail] = useState('');
+    const [subdomain, setSubdomain] = useState('');
+    const [showSsoDialog, setShowSsoDialog] = useState(false);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [mfaModal, setMfaModal] = useState({ open: false, token: '', code: '' });
 
     const { mode, toggleMode } = useThemeMode();
+
+    const handleLoginResponse = (res: { mfa_required?: boolean; mfa_token?: string }) => {
+        if (res.mfa_required && res.mfa_token) {
+            setMfaModal({ open: true, token: res.mfa_token, code: '' });
+            return true;
+        }
+        navigate('/dashboard');
+        return false;
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -43,11 +64,40 @@ export default function Login() {
         setLoading(true);
 
         try {
-            await login(email, password);
-            navigate('/dashboard');
+            const res = await login(email, password);
+            handleLoginResponse(res);
         } catch (err: any) {
             setError(err.response?.data?.error?.message || 'Login failed');
         } finally {
+            setLoading(false);
+        }
+    };
+
+
+
+    const handleMfaSubmit = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            await verifyMFA(mfaModal.token, mfaModal.code);
+            setMfaModal({ ...mfaModal, open: false });
+            navigate('/dashboard');
+        } catch (err: any) {
+            setError('Invalid MFA code');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSsoSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!subdomain) return;
+        setLoading(true);
+        try {
+            const ssoUrl = await initSSO(subdomain);
+            window.location.href = ssoUrl;
+        } catch (err: any) {
+            setError(err.response?.data?.error?.message || 'SSO initialization failed');
             setLoading(false);
         }
     };
@@ -281,6 +331,70 @@ export default function Login() {
                                 >
                                     {loading ? 'Signing in...' : 'Sign In'}
                                 </Button>
+
+
+
+                                <Box sx={{ textAlign: 'center' }}>
+                                    <Button
+                                        variant="text"
+                                        startIcon={<BusinessIcon />}
+                                        onClick={() => setShowSsoDialog(!showSsoDialog)}
+                                        sx={{
+                                            color: 'rgba(255,255,255,0.6)',
+                                            textTransform: 'none',
+                                            fontSize: '0.8rem',
+                                            '&:hover': {
+                                                color: 'white',
+                                                bgcolor: 'transparent'
+                                            }
+                                        }}
+                                    >
+                                        Enterprise SSO
+                                    </Button>
+                                </Box>
+
+                                {showSsoDialog && (
+                                    <Box
+                                        component="div"
+                                        sx={{
+                                            mt: 1,
+                                            p: 2,
+                                            borderRadius: 2,
+                                            bgcolor: 'rgba(255,255,255,0.03)',
+                                            border: '1px solid rgba(255,255,255,0.05)',
+                                            animation: 'slideIn 0.3s ease-out'
+                                        }}
+                                    >
+                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1, display: 'block' }}>
+                                            Enter your company subdomain:
+                                        </Typography>
+                                        <Stack direction="row" spacing={1}>
+                                            <TextField
+                                                size="small"
+                                                placeholder="my-company"
+                                                value={subdomain}
+                                                onChange={(e) => setSubdomain(e.target.value)}
+                                                sx={{
+                                                    flex: 1,
+                                                    '& .MuiOutlinedInput-root': {
+                                                        color: 'white',
+                                                        fontSize: '0.875rem',
+                                                        bgcolor: 'rgba(0,0,0,0.2)',
+                                                        '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={handleSsoSubmit}
+                                                sx={{ px: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                                            >
+                                                Go
+                                            </Button>
+                                        </Stack>
+                                    </Box>
+                                )}
                             </Stack>
 
                             <Box sx={{ mt: 3, textAlign: 'center', p: 1, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.05)' }}>
@@ -318,6 +432,67 @@ export default function Login() {
                     </Typography>
                 </Box>
             </Container>
+
+            {/* MFA Verification Dialog */}
+            <Dialog
+                open={mfaModal.open}
+                onClose={() => setMfaModal({ ...mfaModal, open: false })}
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'rgba(23, 23, 23, 0.95)',
+                        backdropFilter: 'blur(16px)',
+                        color: 'white',
+                        borderRadius: 3,
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        p: 2
+                    }
+                }}
+            >
+                <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>
+                    Multi-Factor Authentication
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                        <VpnKeyIcon sx={{ fontSize: 48, color: '#667eea', mb: 2 }} />
+                        <Typography variant="body1" gutterBottom>
+                            Enter the 6-digit code from your authenticator app
+                        </Typography>
+                    </Box>
+                    <TextField
+                        fullWidth
+                        autoFocus
+                        placeholder="000000"
+                        value={mfaModal.code}
+                        onChange={(e) => setMfaModal({ ...mfaModal, code: e.target.value })}
+                        inputProps={{
+                            maxLength: 6,
+                            style: { textAlign: 'center', fontSize: '2rem', letterSpacing: '0.5rem', fontWeight: 'bold' }
+                        }}
+                        sx={{
+                            '& .MuiOutlinedInput-root': {
+                                bgcolor: 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' }
+                            }
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={handleMfaSubmit}
+                        disabled={mfaModal.code.length !== 6 || loading}
+                        sx={{
+                            py: 1.5,
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        {loading ? <CircularProgress size={24} color="inherit" /> : 'Verify & Sign In'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </InteractiveBackground>
     );
 }

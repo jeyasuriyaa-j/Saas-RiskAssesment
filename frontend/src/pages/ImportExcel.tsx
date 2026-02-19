@@ -15,7 +15,8 @@ import {
     alpha,
     StepConnector,
     stepConnectorClasses,
-    styled
+    styled,
+    useTheme
 } from '@mui/material';
 
 import {
@@ -91,7 +92,9 @@ function QontoStepIcon(props: any) {
     );
 }
 
+
 export default function ImportExcel() {
+    const theme = useTheme();
     const [activeStep, setActiveStep] = useState(0);
     const [jobId, setJobId] = useState<string | null>(null);
     const [, setLoading] = useState(false);
@@ -290,36 +293,9 @@ export default function ImportExcel() {
         fetchStream(jobId);
     }, [fetchStream]);
 
+    // Always reset on page load/refresh — user must re-upload each time
     useEffect(() => {
-        const savedJobId = sessionStorage.getItem('import_job_id');
-        const savedStep = sessionStorage.getItem('import_active_step');
-
-        if (savedJobId && savedStep) {
-            const step = parseInt(savedStep);
-            setJobId(savedJobId);
-            setActiveStep(step);
-
-            importAPI.getJob(savedJobId).then(async (response) => {
-                const job = response.data;
-                if (job.summary) {
-                    setTotalRows(job.summary.total_rows || 0);
-                }
-
-                if (step === 1 && (job.status === 'analyzing' || job.status === 'mapping')) {
-                    if (job.duplicate_report) setDuplicateReport(job.duplicate_report);
-                    importAPI.analyzeRisks(savedJobId).catch(console.error);
-                    startAnalysisStream(savedJobId);
-                } else if (step === 1 && job.status === 'analyzed') {
-                    if (job.duplicate_report) setDuplicateReport(job.duplicate_report);
-                    const analysisResp = await importAPI.getAiAnalysis(savedJobId);
-                    setAiDetailedAnalysis(analysisResp.data.analysis_results || []);
-                    setLoading(false);
-                } else if (step === 2 && job.status === 'completed') {
-                    const resultsResp = await importAPI.getResults(savedJobId);
-                    setImportResults(resultsResp.data);
-                }
-            }).catch(() => clearJobSession());
-        }
+        clearJobSession();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -423,7 +399,13 @@ export default function ImportExcel() {
                     if (jobResp.data.status === 'mapping') {
                         return jobResp.data;
                     }
-                    if (jobResp.data.status === 'failed') throw new Error('Processing failed');
+                    if (jobResp.data.status === 'failed') {
+                        const errorLog = jobResp.data.error_log;
+                        const detailedError = Array.isArray(errorLog) && errorLog.length > 0
+                            ? (errorLog[0].details || errorLog[0].error || 'Processing failed')
+                            : 'Processing failed';
+                        throw new Error(detailedError);
+                    }
                     await new Promise(r => setTimeout(r, 1000));
                     attempts++;
                 }
@@ -534,16 +516,16 @@ export default function ImportExcel() {
                                 p: 8,
                                 textAlign: 'center',
                                 border: '1px solid',
-                                borderColor: isDragActive ? '#6366f1' : 'rgba(255,255,255,0.05)',
-                                bgcolor: isDragActive ? alpha('#6366f1', 0.05) : 'rgba(15, 23, 42, 0.4)',
+                                borderColor: isDragActive ? '#6366f1' : (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)'),
+                                bgcolor: isDragActive ? alpha('#6366f1', 0.05) : (theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.8)'),
                                 cursor: uploadStatus === 'idle' ? 'pointer' : 'default',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: isDragActive ? '0 0 40px rgba(99, 102, 241, 0.2)' : '0 20px 40px rgba(0,0,0,0.4)',
+                                boxShadow: isDragActive ? '0 0 40px rgba(99, 102, 241, 0.2)' : (theme.palette.mode === 'dark' ? '0 20px 40px rgba(0,0,0,0.4)' : '0 4px 20px rgba(0,0,0,0.08)'),
                                 backdropFilter: 'blur(20px)',
                                 '&:hover': {
-                                    borderColor: uploadStatus === 'idle' ? 'rgba(99, 102, 241, 0.4)' : 'rgba(255,255,255,0.05)',
+                                    borderColor: uploadStatus === 'idle' ? 'rgba(99, 102, 241, 0.4)' : (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)'),
                                     transform: uploadStatus === 'idle' ? 'translateY(-4px)' : 'none',
-                                    boxShadow: uploadStatus === 'idle' ? '0 30px 60px rgba(0,0,0,0.5)' : 'none',
+                                    boxShadow: uploadStatus === 'idle' ? (theme.palette.mode === 'dark' ? '0 30px 60px rgba(0,0,0,0.5)' : '0 8px 30px rgba(0,0,0,0.12)') : 'none',
                                 }
                             }}
                         >
@@ -570,7 +552,7 @@ export default function ImportExcel() {
                                         {uploadStatus === 'processing' && 'Extracting Intelligence...'}
                                         {uploadStatus === 'analyzing' && 'AI Neural Processing...'}
                                     </Typography>
-                                    <Typography variant="body1" sx={{ color: alpha('#fff', 0.5), maxWidth: 400, mx: 'auto' }}>
+                                    <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 400, mx: 'auto' }}>
                                         {uploadStatus === 'uploading' && `Payload transfer in progress. Please wait.`}
                                         {uploadStatus === 'processing' && 'Our engine is parsing your risk structure...'}
                                         {uploadStatus === 'analyzing' && 'Large Language Model is identifying and improving risks...'}
@@ -627,7 +609,7 @@ export default function ImportExcel() {
                                     >
                                         Select Enterprise File
                                     </Button>
-                                    <Typography variant="caption" sx={{ display: 'block', mt: 3, color: alpha('#fff', 0.3), fontWeight: 600 }}>
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 3, color: 'text.disabled', fontWeight: 600 }}>
                                         SUPPORTED FORMATS: .XLSX, .CSV, .XLS
                                     </Typography>
                                 </Box>
@@ -678,7 +660,7 @@ export default function ImportExcel() {
                                             mb: 1.5,
                                             borderRadius: 2,
                                             height: 10,
-                                            bgcolor: 'rgba(255,255,255,0.05)',
+                                            bgcolor: 'action.hover',
                                             '& .MuiLinearProgress-bar': {
                                                 background: 'linear-gradient(90deg, #6366f1, #a855f7)',
                                                 boxShadow: '0 0 10px rgba(168, 85, 247, 0.4)'
@@ -686,7 +668,7 @@ export default function ImportExcel() {
                                         }}
                                     />
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="body2" sx={{ color: alpha('#fff', 0.5), fontWeight: 600 }}>
+                                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                                             Processing intelligence clusters...
                                         </Typography>
                                         <Typography variant="body2" fontWeight="800" color="primary.light">
@@ -707,7 +689,7 @@ export default function ImportExcel() {
                                     duplicateReport={duplicateReport}
                                 />
                             ) : (
-                                <Box textAlign="center" py={10} sx={{ bgcolor: 'rgba(15, 23, 42, 0.4)', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <Box textAlign="center" py={10} sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.5)', borderRadius: 4, border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'}` }}>
                                     <CircularProgress size={40} sx={{ mb: 3, color: '#8b5cf6' }} />
                                     <Typography color="text.secondary" fontWeight="600">Initializing AI Data Stream...</Typography>
                                 </Box>
@@ -751,14 +733,14 @@ export default function ImportExcel() {
                             <Typography variant="h3" fontWeight="900" gutterBottom sx={{ letterSpacing: '-0.04em' }}>
                                 Injection <span style={{ color: '#22c55e' }}>Complete</span>
                             </Typography>
-                            <Typography variant="h6" sx={{ color: alpha('#fff', 0.6), mb: 5, maxWidth: 600, mx: 'auto', lineHeight: 1.6 }}>
+                            <Typography variant="h6" sx={{ color: 'text.secondary', mb: 5, maxWidth: 600, mx: 'auto', lineHeight: 1.6 }}>
                                 Strategic integration successful. <b>{importResults.processed_rows}</b> enterprise risks have been mapped and analyzed by our AI core.
                             </Typography>
                             <Box display="flex" justifyContent="center" gap={3}>
                                 <Button
                                     variant="outlined"
                                     onClick={clearJobSession}
-                                    sx={{ borderRadius: '12px', px: 4, py: 1.5, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', color: alpha('#fff', 0.8) }}
+                                    sx={{ borderRadius: '12px', px: 4, py: 1.5, fontWeight: 700, border: `1px solid ${theme.palette.divider}` }}
                                 >
                                     New Injection
                                 </Button>
@@ -778,6 +760,6 @@ export default function ImportExcel() {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </Box>
+        </Box >
     );
 }

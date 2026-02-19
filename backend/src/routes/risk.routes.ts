@@ -28,7 +28,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId } = req.user!;
     const {
         page = 1,
-        limit = 20,
+        limit = 100,
         status,
         owner_id,
         department,
@@ -42,7 +42,6 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
 
     // Build WHERE clause
     const role = req.user?.role;
-    const userDeptId = req.user?.departmentId;
     const userId = req.user?.userId;
 
     // Start with base conditions (different for users vs admins/managers)
@@ -72,9 +71,6 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
         whereConditions.push(`r.status = $${paramIndex}`);
         params.push(dbStatus);
         paramIndex++;
-    } else {
-        // By default, exclude CLOSED risks, unless specifically requested or filtered
-        whereConditions.push(`r.status != 'CLOSED'`);
     }
 
     if (owner_id) {
@@ -84,26 +80,12 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
     }
 
     // Additional role-based filtering
-    // 1. RISK MANAGER: Can only see risks in their Department (unless Admin)
-    if (role === 'risk_manager') {
-        if (userDeptId) {
-            whereConditions.push(`r.department_id = $${paramIndex}`);
-            params.push(userDeptId);
-            paramIndex++;
-        } else {
-            // Fallback: If no dept assigned, maybe see none or their own? 
-            // Sticking to strict: see their own created risks if no dept.
-            whereConditions.push(`r.owner_user_id = $${paramIndex}`);
-            params.push(userId);
-            paramIndex++;
-        }
-    }
-    // 2. USER: Already handled above with OR logic
-    // 3. ADMIN: Sees all (no extra filter)
+    // 1. RISK MANAGER & ADMIN: Sees all risks by default for the tenant
+    // 2. USER: Sees all risks in the tenant (as per current base query)
 
-    // Optional frontend filter for department (if Admin wants to filter)
-    if (department && role === 'admin') {
-        whereConditions.push(`r.department = $${paramIndex}`);
+    // Optional department filter (available for elevated roles)
+    if (department && (role === 'admin' || role === 'risk_manager')) {
+        whereConditions.push(`(r.department = $${paramIndex} OR r.department_id::text = $${paramIndex})`);
         params.push(department);
         paramIndex++;
     }
@@ -145,7 +127,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
             FROM system_config WHERE key = 'scoring'
         )
         SELECT DISTINCT
-            r.risk_id, r.risk_code, r.statement,
+            r.risk_id, r.risk_code, r.statement, r.department,
             r.likelihood_score, r.impact_score, r.inherent_risk_score,
             r.status, r.category as category_name,
             u.full_name as owner_name, r.created_at,
@@ -563,8 +545,8 @@ router.put('/:riskId', authorize('admin', 'risk_manager', 'user'), asyncHandler(
 
     if (inputStatus !== undefined && inputStatus !== currentRisk.status) {
         updates.push(`status = $${paramIndex}`);
-        params.push(String(inputStatus).toUpperCase());
-        changes_tracked.status = { old: currentRisk.status, new: String(inputStatus).toUpperCase() };
+        params.push(String(inputStatus).toLowerCase());
+        changes_tracked.status = { old: currentRisk.status, new: String(inputStatus).toLowerCase() };
         paramIndex++;
     }
 

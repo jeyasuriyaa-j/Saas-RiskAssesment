@@ -12,7 +12,6 @@ import {
     List,
     ListItem,
     ListItemText,
-    Chip,
     CircularProgress
 } from '@mui/material';
 import { Close, ArrowForward } from '@mui/icons-material';
@@ -211,20 +210,24 @@ export default function RiskHeatmap() {
             <Dialog
                 open={Boolean(selectedCell)}
                 onClose={() => setSelectedCell(null)}
-                maxWidth="sm"
+                maxWidth="xs" // More compact
                 fullWidth
                 PaperProps={{
                     sx: {
                         background: (theme) => theme.palette.mode === 'dark'
-                            ? 'rgba(30, 41, 59, 0.98)'
-                            : 'rgba(255, 255, 255, 0.95)',
-                        backdropFilter: 'blur(20px)',
+                            ? 'rgba(15, 23, 42, 0.95)'
+                            : 'rgba(255, 255, 255, 0.98)',
+                        backdropFilter: 'blur(16px)',
                         borderRadius: 4,
-                        boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
-                        border: (theme) => theme.palette.mode === 'dark'
-                            ? '1px solid rgba(255, 255, 255, 0.1)'
-                            : '1px solid rgba(255, 255, 255, 0.4)',
-                        overflow: 'hidden'
+                        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        overflow: 'hidden',
+                        margin: 2, // Ensure it doesn't touch edges
+                        animation: 'modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        '@keyframes modalPop': {
+                            '0%': { opacity: 0, transform: 'scale(0.9) translateY(20px)' },
+                            '100%': { opacity: 1, transform: 'scale(1) translateY(0)' }
+                        }
                     }
                 }}
             >
@@ -232,84 +235,73 @@ export default function RiskHeatmap() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    bgcolor: 'primary.main',
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? 'primary.dark' : 'primary.main',
                     color: 'white',
-                    py: 2
+                    py: 1.5,
+                    px: 2.5
                 }}>
-                    <Typography variant="h6" fontWeight="bold">
-                        Risk List (L:{selectedCell?.l}, I:{selectedCell?.i})
+                    <Typography variant="subtitle1" fontWeight="800" sx={{ letterSpacing: 0.5 }}>
+                        RISK LIST (L:{selectedCell?.l}, I:{selectedCell?.i})
                     </Typography>
-                    <IconButton onClick={() => setSelectedCell(null)} size="small" sx={{ color: 'white' }}>
-                        <Close />
+                    <IconButton onClick={() => setSelectedCell(null)} size="small" sx={{ color: 'white', '&:hover': { transform: 'rotate(90deg)', transition: '0.2s' } }}>
+                        <Close fontSize="small" />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent sx={{ p: 2, pt: 3, bgcolor: 'transparent' }}>
+                <DialogContent sx={{ p: 2, pt: 2, bgcolor: 'transparent' }}>
                     {loadingRisks ? (
                         <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" p={4} gap={2}>
-                            <CircularProgress size={32} />
-                            <Typography variant="body2" color="text.secondary">Fetching risk details...</Typography>
+                            <CircularProgress size={28} thickness={5} />
+                            <Typography variant="caption" color="text.secondary" fontWeight="700">ANALYZING RISKS...</Typography>
                         </Box>
                     ) : (
-                        <List sx={{ py: 1 }}>
-                            {cellRisks.map((risk, index) => (
+                        <List sx={{ py: 0 }}>
+                            {cellRisks.map((risk) => (
                                 <ListItem
                                     key={risk.risk_id}
                                     sx={{
-                                        borderRadius: 3,
-                                        mb: 1.5,
+                                        borderRadius: 2,
+                                        mb: 1,
                                         bgcolor: (theme) => theme.palette.mode === 'dark'
-                                            ? 'rgba(51, 65, 85, 0.6)'
-                                            : 'background.paper',
+                                            ? 'rgba(30, 41, 59, 0.4)'
+                                            : 'rgba(0,0,0,0.02)',
                                         border: '1px solid',
                                         borderColor: 'divider',
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                                         transition: 'all 0.2s',
                                         cursor: 'pointer',
                                         display: 'flex',
-                                        p: 2,
+                                        p: 1.5,
+                                        '&:last-child': { mb: 0 },
                                         '&:hover': {
                                             bgcolor: (theme) => theme.palette.mode === 'dark'
-                                                ? 'rgba(71, 85, 105, 0.8)'
-                                                : 'action.hover',
+                                                ? 'rgba(56, 189, 248, 0.1)'
+                                                : 'rgba(14, 165, 233, 0.05)',
                                             borderColor: 'primary.main',
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
-                                        },
-                                        animation: `slideUp 0.3s ease-out forwards`,
-                                        animationDelay: `${index * 50}ms`
+                                            transform: 'translateY(-1px)',
+                                        }
                                     }}
                                     onClick={() => handleRiskClick(risk)}
                                 >
                                     <ListItemText
                                         primary={risk.title || risk.statement}
+                                        primaryTypographyProps={{
+                                            variant: 'body2',
+                                            fontWeight: 700,
+                                            noWrap: true
+                                        }}
                                         secondary={
-                                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                                                Owner: <strong>{risk.owner_name || 'Unassigned'}</strong>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.2 }}>
+                                                {risk.risk_code} • {risk.owner_name || 'Unassigned'}
                                             </Typography>
                                         }
-                                        primaryTypographyProps={{
-                                            variant: 'body1',
-                                            fontWeight: 600,
-                                            color: 'text.primary'
-                                        }}
                                     />
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Chip
-                                            label={risk.status?.toUpperCase()}
-                                            size="small"
-                                            color={risk.status === 'MITIGATED' ? 'success' : 'primary'}
-                                            sx={{
-                                                fontWeight: 'bold',
-                                                fontSize: '0.65rem'
-                                            }}
-                                        />
-                                        <ArrowForward sx={{ color: 'text.disabled', fontSize: 20 }} />
+                                    <Box sx={{ ml: 1 }}>
+                                        <ArrowForward sx={{ color: 'primary.main', fontSize: 18 }} />
                                     </Box>
                                 </ListItem>
                             ))}
                             {selectedCell?.risks && selectedCell.risks.length > 10 && (
-                                <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mt: 2 }}>
-                                    Showing top 10 of {selectedCell.risks.length} risks.
+                                <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mt: 1, opacity: 0.8 }}>
+                                    + {selectedCell.risks.length - 10} more risks in this cell
                                 </Typography>
                             )}
                         </List>

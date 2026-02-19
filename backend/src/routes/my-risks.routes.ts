@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import { AuthRequest, authenticate } from '../middleware/auth';
 import { query } from '../database/connection';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -7,9 +7,8 @@ import { createTaskCompletionNotification } from '../services/notification.servi
 
 const router = Router();
 
-// All routes require authentication and user role
+// All routes require authentication (any authenticated role can see their own assigned tasks)
 router.use(authenticate);
-router.use(authorize('user'));
 
 /**
  * GET /api/v1/my-risks/dashboard

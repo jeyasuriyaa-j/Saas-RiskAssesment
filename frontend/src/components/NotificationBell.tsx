@@ -29,6 +29,7 @@ interface Notification {
     risk_id?: string;
     risk_code?: string;
     risk_statement?: string;
+    type?: string;
 }
 
 export default function NotificationBell() {
@@ -91,7 +92,10 @@ export default function NotificationBell() {
         }
 
         // Navigate to risk if available
-        if (notification.risk_code) {
+        if (notification.risk_id) {
+            navigate(`/risks/${notification.risk_id}`);
+            handleClose();
+        } else if (notification.risk_code) {
             navigate(`/risks/${notification.risk_code}`);
             handleClose();
         }
@@ -121,7 +125,7 @@ export default function NotificationBell() {
                     sx={{
                         color: 'inherit',
                         '&:hover': {
-                            bgcolor: alpha('#fff', 0.1),
+                            bgcolor: 'action.hover',
                         },
                     }}
                 >

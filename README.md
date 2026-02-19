@@ -11,27 +11,11 @@ An AI-powered Enterprise Risk Management (ERM) SaaS platform designed for high-p
 - **OpenRouter/OpenAI API Key**: For AI-driven analysis
 
 ### Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd Saas-RiskAssesment-main
-   ```
-
-2. **Backend Setup**:
-   ```bash
-   cd backend
-   npm install
-   # Create .env based on .env.example
-   npm run dev
-   ```
-
-3. **Frontend Setup**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+1. Install Node.js, PostgreSQL (Mac: `brew` | Win: `winget`)
+2. Configure environment and database schema
+3. Start backend: `npm run dev` in `backend/`
+4. Start frontend: `npm start` in `frontend/`
+5. Verify access at http://localhost:3000
 
 ## 🛠 Configuration
 

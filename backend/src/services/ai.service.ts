@@ -131,7 +131,7 @@ async function _generateAIResponseInternal(prompt: string, config: AIConfig = {}
     const completionPromise = client.chat.completions.create({
       model: modelName,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.3,
     });
 
@@ -159,7 +159,7 @@ async function _generateAIResponseInternal(prompt: string, config: AIConfig = {}
     const completionPromise = groq.chat.completions.create({
       model: groqModel,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.1,
     });
 
@@ -209,7 +209,7 @@ async function _generateAIResponseInternal(prompt: string, config: AIConfig = {}
     const completionPromise = openai.chat.completions.create({
       model: orModel,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.1,
     });
 
@@ -565,16 +565,20 @@ Return JSON:
 /**
  * Analyze raw Excel sheet data to detect purpose, header row, and layout (Prompt V1.4)
  */
-export async function analyzeExcelSheetStructure(rawData: any[][], tenantId: string) {
+export async function analyzeExcelSheetStructure(rawData: any[][], tenantId: string, sheetName: string = 'Sheet1'): Promise<any> {
   try {
     const tenantConfig = await getTenantConfig(tenantId);
 
-    // Take a larger sample (up to 30 rows) to see context
-    const sampleData = rawData.slice(0, 30);
+    // Take a larger sample (up to 15 rows) to see context
+    const sampleData = rawData.slice(0, 15);
 
-    const prompt = `System Role: You are a data structure expert for risk management.
+    const prompt = `System Role: You are a structural analyzer for Excel sheets in a Risk Management Platform.
+    
+Context:
+- Tenant: "${tenantConfig.org_name}"
+- Sheet Name: "${sheetName}"
 
-Analyze the raw Excel data snippet below (first 30 rows) and identify the sheet structure.
+Analyze the raw Excel data snippet below (first 15 rows) and identify the sheet structure.
 
 Inputs:
 - Tenant Context: ${JSON.stringify(tenantConfig.terminology || {})}
@@ -583,10 +587,13 @@ Inputs:
 Tasks:
 1. Detect PURPOSE: Is this a risk register, maintenance log, incident report, control list, or something else?
 2. Detect LAYOUT: 
-   - Which row contains the headers? (0-indexed)
+   - Which row contains the ACTUAL column headers? (0-indexed). 
+   - Note: Some sheets have a title in Row 0 and headers in Row 1 or 2. Look for the row that has keywords like 'Risk', 'Statement', 'Category', 'Impact', etc.
+   - If the entire sample is empty (except for a title), set header_row_index to null.
    - Which row does the actual data start on?
 3. Detect RELEVANCE: How relevant is this to a Risk Register on a scale of 0-100?
-4. Tone: Use simple, everyday words. Imagine explaining this to someone who has never used a risk tool.
+4. Detect COLUMNS: List the actual column names from the header row if found.
+5. Tone: Use simple, everyday words. Imagine explaining this to someone who has never used a risk tool.
 
 Return JSON:
 {
@@ -596,6 +603,7 @@ Return JSON:
   "data_start_row": 1,
   "relevance_score": 95,
   "confidence": 90,
+  "detected_columns": ["Risk ID", "Statement", "Category"],
   "layout_notes": "Standard grid layout with clear headers."
 }`;
 
@@ -627,6 +635,9 @@ Return JSON:
  * Analyze Excel columns and suggest mappings to risk fields using AI (Prompt V1.1)
  */
 export async function analyzeExcelColumns(detectedColumns: any[], tenantId: string) {
+  if (!detectedColumns || detectedColumns.length === 0) {
+    throw new Error('No columns provided for AI analysis');
+  }
   try {
     const tenantConfig = await getTenantConfig(tenantId);
 
@@ -649,15 +660,17 @@ export async function analyzeExcelColumns(detectedColumns: any[], tenantId: stri
     - description: Detailed explanation.
     - likelihood: 1-5 or similar score.
     - impact: 1-5 or similar score.
-    - category: Risk category (e.g., Cyber, Ops).
-    - owner: Person or Department responsible.
+    - category: General risk category (e.g., Cyber, Ops).
+    - department: Specifically for the Organizational Unit or Department (e.g. "HR", "IT", "Finance").
+    - owner: Person responsible.
     - controls: Existing mitigations.
     - status: Current state.
     
     Tasks:
     1. Identify the BEST match for 'risk_statement'. If multiple columns look like text, the shorter, summarizing one is the statement. The longer one is the description.
-    2. Map other fields as best as possible.
-    3. If no clear title exists, check if 'Description' can serve as the statement.
+    2. Identify the 'department' column. Look for headers like "Dept", "Org Unit", "Business Unit", "Function".
+    3. Map other fields as best as possible.
+    4. If no clear title exists, check if 'Description' can serve as the statement.
     
     Return JSON:
     {

@@ -14,7 +14,8 @@ import {
     TableCell,
     TableContainer,
     TableHead,
-    TableRow
+    TableRow,
+    alpha
 } from '@mui/material';
 import {
     Print as PrintIcon,
@@ -75,7 +76,7 @@ export default function ExecutiveReport() {
     return (
         <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 4 } }}>
             {/* Header Section */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={6} className="no-print">
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={6} className="no-print ExecutiveReport-header">
                 <Typography variant="h4" fontWeight="bold">Executive Board Deck</Typography>
                 <Button
                     variant="contained"
@@ -99,22 +100,34 @@ export default function ExecutiveReport() {
                     <Paper sx={{
                         p: 4,
                         borderRadius: 4,
-                        background: 'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)',
+                        background: (theme) => theme.palette.mode === 'dark'
+                            ? 'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)'
+                            : `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
                         color: 'white',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                        boxShadow: (theme) => theme.palette.mode === 'dark'
+                            ? '0 8px 32px rgba(0,0,0,0.4)'
+                            : '0 8px 32px rgba(0,0,0,0.1)'
                     }}>
                         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
                             <PsychologyIcon sx={{ fontSize: 32 }} />
                             <Typography variant="h5" fontWeight="bold">AI Executive Summary</Typography>
                         </Stack>
-                        <Typography variant="h6" sx={{ opacity: 0.9, lineHeight: 1.6 }}>
+                        <Typography variant="h6" sx={{ opacity: 0.9, lineHeight: 1.6, color: 'white' }}>
                             {data.executive_summary}
                         </Typography>
                         <Box mt={3} display="flex" gap={2}>
                             <Chip
                                 label={`Status: ${data.overall_status}`}
-                                color={data.overall_status === 'Elevated' ? 'warning' : 'success'}
-                                sx={{ bgcolor: 'white', color: 'primary.dark', fontWeight: 'bold' }}
+                                color={data.metrics.risks_by_priority.critical > 0 ? 'error' : (data.overall_status === 'Elevated' ? 'warning' : 'success')}
+                                sx={{
+                                    bgcolor: 'white',
+                                    color: (theme) => data.metrics.risks_by_priority.critical > 0
+                                        ? theme.palette.error.main
+                                        : (data.overall_status === 'Elevated'
+                                            ? theme.palette.warning.main
+                                            : theme.palette.success.main),
+                                    fontWeight: 'bold'
+                                }}
                             />
                         </Box>
                     </Paper>
@@ -163,12 +176,14 @@ export default function ExecutiveReport() {
                                     </Box>
 
                                     <Box>
-                                        <Typography variant="caption" color="text.secondary">KEY ACTIONS</Typography>
-                                        <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontWeight: 700 }}>KEY ACTIONS</Typography>
+                                        <Box component="ul" sx={{ m: 0, pl: 2, '& li': { mb: 1 } }}>
                                             {briefData.key_actions.map((action: string, i: number) => (
-                                                <Chip key={i} label={action} size="small" color="secondary" />
+                                                <Typography component="li" key={i} variant="body2" sx={{ color: 'text.primary' }}>
+                                                    {action}
+                                                </Typography>
                                             ))}
-                                        </Stack>
+                                        </Box>
                                     </Box>
 
                                     <Box display="flex" justifyContent="flex-end">
@@ -183,9 +198,9 @@ export default function ExecutiveReport() {
                 {/* Key Metrics Grid */}
                 <Grid item xs={12} md={4}>
                     <Paper sx={{ p: 3, borderRadius: 3, textAlign: 'center', height: '100%' }}>
-                        <AssessmentIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
+                        <AssessmentIcon sx={{ fontSize: 40, mb: 1, color: parseFloat(data.metrics.average_inherent_risk_score) > 18 ? 'error.main' : (parseFloat(data.metrics.average_inherent_risk_score) > 10 ? 'warning.main' : 'primary.main') }} />
                         <Typography color="text.secondary" gutterBottom>Portfolio Risk Level</Typography>
-                        <Typography variant="h3" fontWeight="bold" color="primary">
+                        <Typography variant="h3" fontWeight="bold" sx={{ color: parseFloat(data.metrics.average_inherent_risk_score) > 18 ? 'error.main' : (parseFloat(data.metrics.average_inherent_risk_score) > 10 ? 'warning.main' : 'primary.main') }}>
                             {data.metrics.average_inherent_risk_score}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">Avg Inherent Score</Typography>
@@ -252,20 +267,41 @@ export default function ExecutiveReport() {
                 {/* Risk Distribution Chart Placeholder */}
                 <Grid item xs={12} md={4}>
                     <Typography variant="h6" fontWeight="bold" mb={2}>Inherent Risk Distribution</Typography>
-                    <Paper sx={{ p: 3, borderRadius: 3, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.50' }}>
+                    <Paper sx={{
+                        p: 3,
+                        borderRadius: 3,
+                        height: 300,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.4) : 'grey.50',
+                        border: '1px solid',
+                        borderColor: 'divider'
+                    }}>
                         <Box textAlign="center">
                             <Box display="flex" gap={1} alignItems="flex-end" height={150} mb={2}>
-                                {['Low', 'Med', 'High', 'Crit'].map((label, i) => (
-                                    <Box key={label} textAlign="center">
-                                        <Box sx={{
-                                            width: 40,
-                                            height: [40, 80, 120, 60][i],
-                                            bgcolor: ['#4caf50', '#ffeb3b', '#ff9800', '#f44336'][i],
-                                            borderRadius: '4px 4px 0 0'
-                                        }} />
-                                        <Typography variant="caption">{label}</Typography>
-                                    </Box>
-                                ))}
+                                {['low', 'medium', 'high', 'critical'].map((label, i) => {
+                                    const count = data.metrics.risks_by_priority[label] || 0;
+                                    const total = data.metrics.total_risks || 1;
+                                    const displayHeight = count > 0 ? (count / total) * 120 : 0;
+
+                                    return (
+                                        <Box key={label} textAlign="center" sx={{ width: 45 }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                                                {count}
+                                            </Typography>
+                                            <Box sx={{
+                                                width: 40,
+                                                height: displayHeight,
+                                                bgcolor: ['#4caf50', '#ffeb3b', '#ff9800', '#f44336'][i],
+                                                borderRadius: '4px 4px 0 0',
+                                                mx: 'auto',
+                                                transition: 'height 0.3s ease'
+                                            }} />
+                                            <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>{label === 'low' ? 'Low' : label === 'medium' ? 'Med' : label === 'high' ? 'High' : 'Crit'}</Typography>
+                                        </Box>
+                                    );
+                                })}
                             </Box>
                             <Typography variant="body2" color="text.secondary">Risk Density Breakdown</Typography>
                         </Box>
@@ -289,92 +325,120 @@ export default function ExecutiveReport() {
                 __html: `
                 @media print {
                     @page {
-                        size: A4 landscape;
+                        size: A4 portrait;
                         margin: 10mm;
                     }
                     
-                    /* Hide navigation and non-content elements */
+                    /* Aggressively hide ALL non-report elements */
                     .no-print,
                     .MuiDrawer-root,
                     .MuiAppBar-root,
+                    .sidebar,
+                    header,
                     nav,
-                    aside {
+                    aside,
+                    footer,
+                    [role="complementary"],
+                    button:not([type="button"]),
+                    .MuiFab-root,
+                    [aria-label="Chat"],
+                    .intercom-launcher,
+                    [class*="ChatWidget"],
+                    /* Hide EVERYTHING sticky/fixed (Floating Top Pill, Chat bubble, etc) */
+                    [style*="position: sticky"],
+                    [style*="position: fixed"],
+                    .MuiPaper-root[style*="sticky"] {
                         display: none !important;
+                        visibility: hidden !important;
+                        opacity: 0 !important;
+                        pointer-events: none !important;
                     }
                     
-                    /* Ensure body and root are visible */
-                    body {
+                    /* Reset global layout */
+                    html, body {
                         background: white !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        width: 100% !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
-                    
-                    /* Remove sidebar offset and use full width */
-                    body > div,
-                    #root,
+
+                    #root, main {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: 100% !important;
+                        background: white !important;
+                    }
+
+                    /* Remove sidebar offset */
                     main {
-                        max-width: none !important;
+                        margin-left: 0 !important;
+                        padding-left: 0 !important;
+                    }
+
+                    /* Content specific resets */
+                    main > div, 
+                    main > div > div,
+                    .MuiContainer-root {
+                        max-width: 100% !important;
                         width: 100% !important;
                         margin: 0 !important;
-                        margin-left: 0 !important;
                         padding: 0 !important;
                     }
                     
-                    /* Ensure main content box uses full width */
-                    main > div > div {
-                        max-width: none !important;
-                        width: 100% !important;
-                        padding: 10mm !important;
-                        margin: 0 !important;
-                    }
-                    
-                    /* Page break controls - only for sections with page-break class */
-                    .page-break {
-                        page-break-before: always;
-                    }
-                    
-                    /* Keep Paper components together */
+                    /* Card Styling for Print */
                     .MuiPaper-root {
-                        box-shadow: none !important;
+                        background: #fff !important;
                         border: 1px solid #ddd !important;
-                        margin-bottom: 8px !important;
-                        page-break-inside: avoid;
-                        page-break-after: auto;
+                        box-shadow: none !important;
+                        margin-bottom: 20px !important;
+                        page-break-inside: avoid !important;
+                        color: black !important;
                     }
                     
-                    /* Keep headings with content */
-                    h3, h5, h6 {
-                        page-break-after: avoid;
-                        page-break-inside: avoid;
-                    }
-                    
-                    /* Compact spacing */
-                    .MuiGrid-container {
-                        gap: 8px !important;
-                    }
-                    
-                    .MuiCardContent-root {
-                        padding: 12px !important;
-                    }
-                    
-                    /* Slightly reduce font sizes */
-                    h3 {
-                        font-size: 1.3rem !important;
-                    }
-                    
-                    h5 {
-                        font-size: 1rem !important;
-                    }
-                    
-                    h6 {
-                        font-size: 0.9rem !important;
-                    }
-                    
-                    /* Force colors to print */
-                    * {
+                    /* AI Summary Card - Specialized but clean */
+                    .MuiPaper-root[style*="gradient"] {
+                        background: #fdfdfd !important;
+                        border: 2px solid #1a237e !important;
+                        color: #1a237e !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
-                        color-adjust: exact !important;
+                    }
+                    
+                    /* Typography Contrast */
+                    h3, h4, h5, h6, p, span, td, th {
+                        color: #000 !important;
+                        -webkit-print-color-adjust: exact;
+                    }
+
+                    /* Chart Bars - Force Background Color */
+                    [class*="MuiBox-root"][style*="background-color"], 
+                    [class*="MuiBox-root"][style*="bgcolor"] {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+
+                    /* Force page break for Top Risks if necessary */
+                    .page-break {
+                        page-break-before: always !important;
+                        padding-top: 10px !important;
+                    }
+
+                    /* Grid to Block for Print */
+                    .MuiGrid-container {
+                        display: block !important;
+                    }
+                    .MuiGrid-item {
+                        display: block !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin-bottom: 15px !important;
+                    }
+
+                    /* Hide the Export button itself in print */
+                    .ExecutiveReport-header button {
+                        display: none !important;
                     }
                 }
             ` }} />

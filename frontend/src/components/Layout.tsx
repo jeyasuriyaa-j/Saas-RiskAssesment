@@ -92,63 +92,20 @@ export default function Layout() {
     const getMenuItems = () => {
         const role = user?.role?.toLowerCase();
 
-        const baseItems = [
-            { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
+        const items = [
+            { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard', roles: ['admin', 'risk_manager', 'auditor', 'viewer', 'user'] },
+            { text: 'Risk Register', icon: <ClipboardList size={20} />, path: '/risks', roles: ['admin', 'risk_manager', 'auditor', 'viewer'] },
+            { text: 'My Risks', icon: <CheckSquare size={20} />, path: '/my-risks', roles: ['user', 'admin', 'risk_manager', 'auditor', 'viewer'] },
+            { text: 'Controls', icon: <Shield size={20} />, path: '/controls', roles: ['admin', 'risk_manager', 'auditor'] },
+            { text: 'Incidents', icon: <AlertTriangle size={20} />, path: '/incidents', roles: ['admin', 'risk_manager', 'auditor', 'user', 'viewer'] },
+            { text: 'Executive Board', icon: <BarChart3 size={20} />, path: '/governance/report', roles: ['admin', 'risk_manager', 'auditor', 'viewer'] },
+            { text: 'Import Excel', icon: <Upload size={20} />, path: '/import', roles: ['admin', 'risk_manager'] },
+            { text: 'AI Analysis', icon: <Brain size={20} />, path: '/governance', roles: ['admin', 'risk_manager'] },
+            { text: 'Users', icon: <UsersIcon size={20} />, path: '/admin/users', roles: ['admin'] },
+            { text: 'Settings', icon: <SettingsIcon size={20} />, path: '/admin/settings', roles: ['admin'] },
         ];
 
-        // CRO / Admin (Full Access)
-        if (role === 'admin') {
-            return [
-                ...baseItems,
-                { text: 'Risk Register', icon: <ClipboardList size={20} />, path: '/risks' },
-                { text: 'Controls', icon: <Shield size={20} />, path: '/controls' },
-                { text: 'Incidents', icon: <AlertTriangle size={20} />, path: '/incidents' },
-                { text: 'Executive Board', icon: <BarChart3 size={20} />, path: '/governance/report' },
-                { text: 'Import Excel', icon: <Upload size={20} />, path: '/import' },
-                { text: 'Users', icon: <UsersIcon size={20} />, path: '/admin/users' },
-                { text: 'AI Analysis', icon: <Brain size={20} />, path: '/governance' },
-                { text: 'Settings', icon: <SettingsIcon size={20} />, path: '/admin/settings' }
-            ];
-        }
-
-        // Risk Manager
-        if (role === 'risk_manager') {
-            return [
-                ...baseItems,
-                { text: 'Risk Register', icon: <ClipboardList size={20} />, path: '/risks' },
-                { text: 'Controls', icon: <Shield size={20} />, path: '/controls' },
-                { text: 'Incidents', icon: <AlertTriangle size={20} />, path: '/incidents' },
-                { text: 'Executive Board', icon: <BarChart3 size={20} />, path: '/governance/report' },
-                { text: 'Import Excel', icon: <Upload size={20} />, path: '/import' },
-                { text: 'AI Analysis', icon: <Brain size={20} />, path: '/governance' }
-            ];
-        }
-
-        // Auditor
-        if (role === 'auditor') {
-            return [
-                ...baseItems,
-                { text: 'Risk Register', icon: <ClipboardList size={20} />, path: '/risks' },
-                { text: 'Controls', icon: <Shield size={20} />, path: '/controls' },
-                { text: 'AI Analysis', icon: <Brain size={20} />, path: '/governance' }
-            ];
-        }
-
-        // Board Member
-        if (role === 'viewer') {
-            return [
-                ...baseItems,
-                { text: 'Executive Board', icon: <BarChart3 size={20} />, path: '/governance/report' },
-                { text: 'AI Analysis', icon: <Brain size={20} />, path: '/governance' }
-            ];
-        }
-
-        // Default / Risk Owner
-        return [
-            ...baseItems,
-            { text: 'My Risks', icon: <CheckSquare size={20} />, path: '/my-risks' },
-            { text: 'Incidents', icon: <AlertTriangle size={20} />, path: '/incidents' },
-        ];
+        return items.filter(item => !item.roles || item.roles.includes(role || ''));
     };
 
     const menuItems = getMenuItems();
@@ -216,7 +173,7 @@ export default function Layout() {
                     <Typography variant="h5" fontWeight={800} sx={{
                         background: mode === 'dark'
                             ? 'linear-gradient(to right, #fff, #94a3b8)'
-                            : `linear-gradient(to right, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            : `linear-gradient(to right, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                         letterSpacing: '-0.02em'
@@ -226,11 +183,12 @@ export default function Layout() {
                     <Typography variant="caption" sx={{
                         fontWeight: 700,
                         letterSpacing: '0.15em',
-                        color: 'text.secondary',
+                        color: mode === 'dark' ? 'text.secondary' : 'primary.main',
                         textTransform: 'uppercase',
                         fontSize: '0.65rem',
                         display: 'block',
-                        pl: 0.5
+                        pl: 0.5,
+                        opacity: mode === 'dark' ? 1 : 0.8
                     }}>
                         Enterprise Edition
                     </Typography>
@@ -266,12 +224,12 @@ export default function Layout() {
                                         '&.Mui-selected': {
                                             background: mode === 'dark'
                                                 ? `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.15)}, transparent)`
-                                                : `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.08)}, transparent)`,
+                                                : `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.1)}, transparent)`,
                                             borderLeft: `3px solid ${theme.palette.primary.main}`,
                                             '&:hover': {
                                                 background: mode === 'dark'
                                                     ? `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.25)}, transparent)`
-                                                    : `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.12)}, transparent)`,
+                                                    : `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.15)}, transparent)`,
                                             }
                                         },
                                         '&:not(.Mui-selected):hover': {
@@ -293,7 +251,7 @@ export default function Layout() {
                                             variant: 'body2',
                                             fontWeight: active ? 700 : 500,
                                             fontSize: '0.95rem',
-                                            color: active ? 'text.primary' : 'text.secondary'
+                                            color: 'text.primary'
                                         }}
                                     />
                                     {active && (
@@ -323,30 +281,32 @@ export default function Layout() {
                         p: 1.5,
                         borderRadius: 3,
                         cursor: 'pointer',
-                        background: alpha(theme.palette.background.default, 0.6),
+                        background: alpha(theme.palette.background.paper, 0.6),
                         border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                         backdropFilter: 'blur(10px)',
                         transition: 'all 0.3s',
                         '&:hover': {
                             transform: 'translateY(-2px)',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+                            boxShadow: mode === 'dark' ? '0 8px 24px rgba(0,0,0,0.4)' : '0 8px 24px rgba(0,0,0,0.06)',
                             borderColor: theme.palette.primary.main
                         }
                     }}
                 >
                     <Stack direction="row" spacing={1.5} alignItems="center">
                         <Avatar sx={{
-                            width: 40,
-                            height: 40,
+                            width: 36,
+                            height: 36,
                             bgcolor: 'primary.main',
                             background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                             boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`,
-                            border: `2px solid ${theme.palette.background.paper}`
+                            border: `2px solid ${theme.palette.background.paper}`,
+                            fontSize: '0.9rem',
+                            fontWeight: 700
                         }}>
                             {user?.full_name?.charAt(0)}
                         </Avatar>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="subtitle2" fontWeight={700} noWrap>
+                            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ color: 'text.primary' }}>
                                 {user?.full_name || 'User'}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
@@ -379,9 +339,9 @@ export default function Layout() {
                     sx={{
                         height: '100%',
                         borderRadius: 4,
-                        bgcolor: alpha(theme.palette.background.paper, 0.8),
+                        bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.8 : 0.95),
                         backdropFilter: 'blur(20px)',
-                        border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                         boxShadow: mode === 'dark'
                             ? '0 20px 40px rgba(0,0,0,0.4)'
                             : '0 20px 40px rgba(0,0,0,0.05)',
@@ -505,12 +465,20 @@ export default function Layout() {
                 transformOrigin={{ horizontal: 'center', vertical: 'bottom' }} // Changed for floating sidebar
                 anchorOrigin={{ horizontal: 'right', vertical: 'top' }}
             >
-                <MenuItem onClick={() => navigate('/admin/settings')} sx={{ py: 1.5, px: 2.5, mx: 1, borderRadius: 1.5, mb: 0.5 }}>
+                <MenuItem onClick={() => navigate('/security')} sx={{ py: 1.5, px: 2.5, mx: 1, borderRadius: 1.5, mb: 0.5 }}>
                     <ListItemIcon>
-                        <SettingsIcon size={18} />
+                        <Shield size={18} />
                     </ListItemIcon>
-                    <Typography variant="body2" fontWeight={600}>Settings</Typography>
+                    <Typography variant="body2" fontWeight={600}>Security</Typography>
                 </MenuItem>
+                {user?.role?.toLowerCase() === 'admin' && (
+                    <MenuItem onClick={() => navigate('/admin/settings')} sx={{ py: 1.5, px: 2.5, mx: 1, borderRadius: 1.5, mb: 0.5 }}>
+                        <ListItemIcon>
+                            <SettingsIcon size={18} />
+                        </ListItemIcon>
+                        <Typography variant="body2" fontWeight={600}>Settings</Typography>
+                    </MenuItem>
+                )}
                 <Divider sx={{ my: 0.5, opacity: 0.1 }} />
                 <MenuItem onClick={handleLogout} sx={{ color: 'error.main', py: 1.5, px: 2.5, mx: 1, borderRadius: 1.5, mt: 0.5 }}>
                     <ListItemIcon sx={{ color: 'error.main' }}>

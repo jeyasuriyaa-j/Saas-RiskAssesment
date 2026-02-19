@@ -4,11 +4,12 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeModeProvider } from './contexts/ThemeModeContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import AuthCallback from './pages/AuthCallback';
+import SecuritySettings from './pages/SecuritySettings';
 import Dashboard from './pages/Dashboard';
 import RiskList from './pages/RiskList';
 import RiskDetail from './pages/RiskDetail';
 import ImportExcel from './pages/ImportExcel';
-import DocumentAnalysis from './pages/DocumentAnalysis';
 import AdminSettings from './pages/admin/Settings';
 import Users from './pages/admin/Users';
 import Controls from './pages/Controls';
@@ -17,56 +18,28 @@ import IncidentDetail from './pages/IncidentDetail';
 import Governance from './pages/Governance';
 import ExecutiveReport from './pages/ExecutiveReport';
 import RiskMap from './pages/RiskMap';
-import Vendors from './pages/Vendors';
 import MyRisks from './pages/MyRisks';
 import Layout from './components/Layout';
-import PeerComparison from './pages/PeerComparison';
-import SOC2Dashboard from './pages/SOC2Dashboard';
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, loading } = useAuth();
-    if (loading) return null;
-    return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+interface RoleRouteProps {
+    children: React.ReactNode;
+    allowedRoles?: string[];
 }
 
-
-function AdminRoute({ children }: { children: React.ReactNode }) {
+function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
     const { isAuthenticated, user, loading } = useAuth();
 
     if (loading) return null;
 
-    if (!isAuthenticated || user?.role !== 'admin') {
-        return <Navigate to="/" />;
+    if (!isAuthenticated) {
+        return <Navigate to="/login" />;
     }
 
-    return <>{children}</>;
-}
-
-function ManagerRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, user, loading } = useAuth();
-
-    if (loading) return null;
-
-    const allowedRoles = ['admin', 'risk_manager'];
-    const userRole = user?.role?.toLowerCase() || '';
-
-    if (!isAuthenticated || !allowedRoles.includes(userRole)) {
-        return <Navigate to="/" />;
-    }
-
-    return <>{children}</>;
-}
-
-function ViewRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, user, loading } = useAuth();
-
-    if (loading) return null;
-
-    const allowedRoles = ['admin', 'risk_manager', 'auditor', 'viewer', 'user'];
-    const userRole = user?.role?.toLowerCase() || '';
-
-    if (!isAuthenticated || !allowedRoles.includes(userRole)) {
-        return <Navigate to="/" />;
+    if (allowedRoles && user) {
+        const userRole = user.role?.toLowerCase() || '';
+        if (!allowedRoles.includes(userRole)) {
+            return <Navigate to="/dashboard" replace />;
+        }
     }
 
     return <>{children}</>;
@@ -85,8 +58,10 @@ function App() {
             <ThemeModeProvider>
                 <AuthProvider>
                     <Routes>
-                        <Route path="/login" element={<Navigate to="/" replace />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/auth/callback" element={<AuthCallback />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/security" element={<RoleRoute><SecuritySettings /></RoleRoute>} />
 
                         {/* Landing Page is now Login */}
                         <Route path="/" element={<RootRedirect />} />
@@ -94,35 +69,31 @@ function App() {
                         {/* Protected Routes (Flat Structure) */}
                         <Route
                             element={
-                                <PrivateRoute>
+                                <RoleRoute>
                                     <Layout />
-                                </PrivateRoute>
+                                </RoleRoute>
                             }
                         >
                             <Route path="dashboard" element={<Dashboard />} />
-                            <Route path="my-risks" element={<MyRisks />} />
+                            <Route path="my-risks" element={<RoleRoute allowedRoles={['user', 'admin']}><MyRisks /></RoleRoute>} />
 
                             {/* Manager/Admin only routes */}
-                            <Route path="risks" element={<ViewRoute><RiskList /></ViewRoute>} />
-                            <Route path="risks/:riskId" element={<ViewRoute><RiskDetail /></ViewRoute>} />
-                            <Route path="controls" element={<ViewRoute><Controls /></ViewRoute>} />
-                            <Route path="governance/report" element={<ViewRoute><ExecutiveReport /></ViewRoute>} />
-                            <Route path="governance/map" element={<ViewRoute><RiskMap /></ViewRoute>} />
-                            <Route path="vendors" element={<ManagerRoute><Vendors /></ManagerRoute>} />
-                            <Route path="import" element={<ManagerRoute><ImportExcel /></ManagerRoute>} />
-                            <Route path="document-analysis" element={<ManagerRoute><DocumentAnalysis /></ManagerRoute>} />
-                            <Route path="peer-comparison" element={<ViewRoute><PeerComparison /></ViewRoute>} />
-                            <Route path="soc2-dashboard" element={<ManagerRoute><SOC2Dashboard /></ManagerRoute>} />
+                            <Route path="risks" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor', 'viewer', 'user']}><RiskList /></RoleRoute>} />
+                            <Route path="risks/:riskId" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor', 'viewer', 'user']}><RiskDetail /></RoleRoute>} />
+                            <Route path="controls" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor']}><Controls /></RoleRoute>} />
+                            <Route path="governance/report" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor', 'viewer']}><ExecutiveReport /></RoleRoute>} />
+                            <Route path="governance/map" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor', 'viewer']}><RiskMap /></RoleRoute>} />
+                            <Route path="import" element={<RoleRoute allowedRoles={['admin', 'risk_manager']}><ImportExcel /></RoleRoute>} />
 
-                            <Route path="incidents" element={<ViewRoute><Incidents /></ViewRoute>} />
-                            <Route path="incidents/:eventId" element={<ViewRoute><IncidentDetail /></ViewRoute>} />
+                            <Route path="incidents" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'user', 'auditor', 'viewer']}><Incidents /></RoleRoute>} />
+                            <Route path="incidents/:eventId" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'user', 'auditor', 'viewer']}><IncidentDetail /></RoleRoute>} />
 
                             <Route
                                 path="governance"
                                 element={
-                                    <ViewRoute>
+                                    <RoleRoute allowedRoles={['admin', 'risk_manager']}>
                                         <Governance />
-                                    </ViewRoute>
+                                    </RoleRoute>
                                 }
                             />
 
@@ -130,17 +101,17 @@ function App() {
                             <Route
                                 path="admin/settings"
                                 element={
-                                    <ManagerRoute>
+                                    <RoleRoute allowedRoles={['admin']}>
                                         <AdminSettings />
-                                    </ManagerRoute>
+                                    </RoleRoute>
                                 }
                             />
                             <Route
                                 path="admin/users"
                                 element={
-                                    <AdminRoute>
+                                    <RoleRoute allowedRoles={['admin']}>
                                         <Users />
-                                    </AdminRoute>
+                                    </RoleRoute>
                                 }
                             />
                         </Route>

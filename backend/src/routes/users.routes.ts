@@ -14,7 +14,7 @@ router.use(authenticate);
  * Get all users for the current tenant
  * GET /api/v1/users
  */
-router.get('/', authorize('admin', 'risk_manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/', authorize('admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId, role } = req.user!;
     const { page = 1, limit = 20 } = req.query;
 

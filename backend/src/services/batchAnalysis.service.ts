@@ -29,6 +29,7 @@ export interface AnalysisResult {
     improved_statement: string;
     improved_description: string;
     suggested_category: string;
+    department?: string;
     score_analysis: {
       user_score_status: string;
       suggested_likelihood: number;
@@ -333,7 +334,7 @@ Analyze the following risk and return:
   "riskScore": number,
   "remediation": "Concise 1-sentence action",
   "recommendedControls": ["Control 1", "Control 2"],
-  "department": "Department name"
+  "department": "Most appropriate department name"
 }
 
 Risk:
@@ -361,6 +362,7 @@ Send only the JSON response.`;
       improved_statement: parsed.improvedTitle || parsed.improved_statement || entry.statement,
       improved_description: parsed.improvedDescription || parsed.improved_description || entry.description,
       suggested_category: parsed.department || parsed.suggested_category || entry.category,
+      department: parsed.department || entry.category,
       score_analysis: {
         user_score_status: 'Aligned', // Default
         suggested_likelihood: parsed.likelihood || entry.likelihood,
@@ -564,8 +566,8 @@ export interface BatchConfig {
 const DEFAULT_BATCH_CONFIG: BatchConfig = {
   batchSize: 25,      // 25 risks per AI call
   workerCount: 4,     // 4 concurrent workers
-  maxRetries: 1,      // Max 1 retry per batch
-  retryDelay: 1000    // 1s between retries
+  maxRetries: 2,      // Max 2 retries per batch
+  retryDelay: 2000    // 2s between retries
 };
 
 export interface RiskInput {
@@ -585,6 +587,7 @@ export interface RiskAnalysisOutput {
   likelihood_score: number;
   risk_score: number;
   suggestions: string;
+  department?: string;
   why_matters?: string;
   financial_impact_estimate?: string;
 }
@@ -676,25 +679,33 @@ async function analyzeBatchWithAI(
     im: r.impact
   }));
 
-  const prompt = `You are a risk management expert. Analyze these ${inputs.length} risks. Return a JSON array ONLY — no markdown, no extra text.
+  const inputIds = new Set(inputs.map(r => r.id));
+
+  const prompt = `You are a risk management expert. Analyze EXACTLY the ${inputs.length} risk(s) provided below.
+
+CRITICAL RULES:
+- Return a JSON array containing EXACTLY ${inputs.length} object(s) — one per input risk.
+- DO NOT invent, add, or hallucinate extra risks that are not in the input.
+- Each output object MUST have "i" set to the same id value from the corresponding input.
+- The output array length MUST equal ${inputs.length}.
 
 Input risks:
 ${JSON.stringify(compactInput)}
 
-For EACH risk, return an object with these keys:
-- "i": the id from the input
+For EACH risk in the input, return an object with:
+- "i": EXACTLY the id value from the input (do not change it)
 - "t": a professional, brief risk title (MAX 10 words)
-- "d": a concise, improved description (MAX 2 sentences, focused on root cause and impact)
+- "d": a concise, improved description (MAX 2 sentences, root cause and impact only)
 - "dp": the most appropriate department
 - "l": likelihood score 1-5
-- "im": impact score 1-5  
-- "r": a sharp, 1-sentence remediation recommendation
-- "fi": estimated financial impact range (e.g. "$10K-$50K")
+- "im": impact score 1-5
+- "r": a 1-sentence remediation recommendation
+- "fi": estimated financial impact (e.g. "$10K-$50K")
 
-Return ONLY the JSON array.`;
+Return ONLY the JSON array with ${inputs.length} item(s). No markdown, no explanation.`;
 
   try {
-    const response = await generateAIResponse(prompt, { timeout: 20000 });
+    const response = await generateAIResponse(prompt, { timeout: 60000 });
     const parsed = extractJSON<any[]>(response);
 
     if (!Array.isArray(parsed)) {
@@ -703,11 +714,35 @@ Return ONLY the JSON array.`;
       return [mapParsedToOutput(single, inputs)];
     }
 
-    // Map parsed results back to full output, calculating risk_score locally
-    return parsed.map((p: any) => {
-      // Find matching input by id
-      const matchInput = inputs.find(inp => inp.id === p.i) || inputs[0];
-      return mapParsedToOutput(p, inputs, matchInput);
+    // ANTI-HALLUCINATION FILTER: only keep results whose 'i' matches a real input ID.
+    // This prevents the AI from injecting extra risks not present in the original data.
+    const validParsed = parsed.filter((p: any) => inputIds.has(p.i));
+
+    if (validParsed.length !== inputs.length) {
+      logger.warn(`AI returned ${parsed.length} items for ${inputs.length} inputs. Filtered to ${validParsed.length} valid. Filling missing with fallback.`);
+    }
+
+    // Build a map from id -> parsed result for quick lookup
+    const parsedById = new Map<number, any>();
+    for (const p of validParsed) parsedById.set(p.i, p);
+
+    // Return one result per input — use AI result if available, else fallback
+    return inputs.map(inp => {
+      const p = parsedById.get(inp.id);
+      if (p) return mapParsedToOutput(p, inputs, inp);
+      // Missing: build a fallback that preserves original data
+      return {
+        id: inp.id,
+        improved_title: inp.title,
+        improved_description: inp.description,
+        impact_score: inp.impact,
+        likelihood_score: inp.likelihood,
+        risk_score: inp.impact * inp.likelihood,
+        suggestions: inp.department,
+        department: inp.department,
+        why_matters: 'AI analysis unavailable — using original data.',
+        financial_impact_estimate: 'N/A'
+      };
     });
 
   } catch (error: any) {
@@ -730,6 +765,7 @@ function mapParsedToOutput(p: any, inputs: RiskInput[], matchInput?: RiskInput):
     likelihood_score: likelihoodScore,
     risk_score: impactScore * likelihoodScore, // LOCAL calculation
     suggestions: p.dp || p.department || input.department,
+    department: p.dp || p.department || input.department,
     why_matters: p.r || p.remediation || 'AI-assessed risk.',
     financial_impact_estimate: p.fi || 'N/A'
   };

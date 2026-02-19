@@ -194,11 +194,11 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 p: 2,
-                bgcolor: 'rgba(15, 23, 42, 0.4)',
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.9)',
                 borderRadius: 3,
-                border: '1px solid rgba(255,255,255,0.05)',
+                border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'}`,
                 backdropFilter: 'blur(10px)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)'
             }}>
                 <Stack direction="row" spacing={3} alignItems="center">
                     <Stack direction="row" spacing={1} alignItems="center">
@@ -219,16 +219,16 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                         onChange={(e) => setSearchTerm(e.target.value)}
                         size="small"
                         InputProps={{
-                            startAdornment: (<InputAdornment position="start"><Search size={16} style={{ color: alpha('#fff', 0.4) }} /></InputAdornment>),
+                            startAdornment: (<InputAdornment position="start"><Search size={16} style={{ color: theme.palette.text.secondary }} /></InputAdornment>),
                         }}
                         sx={{
                             width: 280,
                             '& .MuiInputBase-root': {
                                 fontSize: '0.85rem',
                                 height: 36,
-                                bgcolor: alpha('#fff', 0.03),
+                                bgcolor: alpha(theme.palette.text.primary, 0.04),
                                 borderRadius: '10px',
-                                border: '1px solid rgba(255,255,255,0.08)'
+                                border: `1px solid ${theme.palette.divider}`
                             }
                         }}
                     />
@@ -237,7 +237,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                         <Chip
                             label={`${stats.total} Total`}
                             size="small"
-                            sx={{ height: 26, fontWeight: 700, bgcolor: alpha('#fff', 0.05), border: '1px solid rgba(255,255,255,0.1)' }}
+                            sx={{ height: 26, fontWeight: 700, bgcolor: alpha(theme.palette.text.primary, 0.06), border: `1px solid ${theme.palette.divider}` }}
                         />
                         <Chip
                             label={`${stats.pending} Pending`}
@@ -286,7 +286,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                             <Button
                                 size="small"
                                 variant="text"
-                                sx={{ color: alpha('#fff', 0.5), fontWeight: 700, textTransform: 'none' }}
+                                sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}
                                 onClick={onCancel}
                             >
                                 Cancel
@@ -301,9 +301,13 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                     borderRadius: '10px',
                                     fontWeight: 800,
                                     textTransform: 'none',
+                                    whiteSpace: 'nowrap',
                                     background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                                     boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)',
-                                    px: 3
+                                    px: 2.5,
+                                    py: 0.75,
+                                    minHeight: 36,
+                                    lineHeight: 1
                                 }}
                             >
                                 Batch Import
@@ -313,9 +317,9 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                     <Tooltip title="Deep Export">
                         <IconButton
                             size="small"
-                            sx={{ bgcolor: alpha('#fff', 0.05), border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}
+                            sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05), border: `1px solid ${theme.palette.divider}`, borderRadius: '8px' }}
                         >
-                            <Download size={16} style={{ color: alpha('#fff', 0.6) }} />
+                            <Download size={16} style={{ color: theme.palette.text.secondary }} />
                         </IconButton>
                     </Tooltip>
                 </Stack>
@@ -329,8 +333,8 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                     flexGrow: 1,
                     overflow: 'auto',
                     p: 2,
-                    bgcolor: 'rgba(15, 23, 42, 0.2)',
-                    border: '1px solid rgba(255,255,255,0.03)',
+                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.2)' : 'rgba(255, 255, 255, 0.5)',
+                    border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.06)'}`,
                     '&::-webkit-scrollbar': { width: 8, height: 8 },
                     '&::-webkit-scrollbar-track': { background: 'transparent' },
                     '&::-webkit-scrollbar-thumb': { background: theme.palette.divider, borderRadius: 4 }
@@ -346,7 +350,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                 fontSize: '0.7rem',
                                 textTransform: 'uppercase',
                                 py: 1,
-                                color: alpha('#fff', 0.4),
+                                color: 'text.secondary',
                                 letterSpacing: '0.05em'
                             }
                         }}>
@@ -356,7 +360,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                     checked={selectedRisks.length > 0 && selectedRisks.length === filteredRisks.length}
                                     indeterminate={selectedRisks.length > 0 && selectedRisks.length < filteredRisks.length}
                                     onChange={(e) => handleSelectAll(e.target.checked)}
-                                    sx={{ color: alpha('#fff', 0.2), '&.Mui-checked': { color: '#6366f1' } }}
+                                    sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                                 />
                             </TableCell>
                             <TableCell>INTEL STATEMENT</TableCell>
@@ -390,18 +394,18 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                         onClick={() => handleRowClick(originalIdx)}
                                         sx={{
                                             cursor: 'pointer',
-                                            bgcolor: alpha('#fff', 0.015),
+                                            bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.015) : alpha('#000', 0.01),
                                             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                             '&:hover': {
                                                 bgcolor: alpha('#6366f1', 0.05) + ' !important',
                                                 transform: 'scale(1.002)',
-                                                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                                                boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.08)',
                                             },
                                             '&.Mui-selected': {
                                                 bgcolor: alpha('#6366f1', 0.1) + ' !important',
                                             },
                                             '& td': {
-                                                borderBottom: '1px solid rgba(255,255,255,0.03)',
+                                                borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)'}`,
                                                 py: 1, px: 2,
                                                 borderColor: 'transparent',
                                                 firstOfType: { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 },
@@ -414,7 +418,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                                 size="small"
                                                 checked={selectedRisks.includes(idx)}
                                                 onChange={() => handleSelectRisk(idx)}
-                                                sx={{ color: alpha('#fff', 0.2), '&.Mui-checked': { color: '#6366f1' } }}
+                                                sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                                             />
                                         </TableCell>
                                         <TableCell sx={{ maxWidth: 450 }}>
@@ -440,15 +444,15 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                                         />
                                                     </Box>
                                                 ) : (
-                                                    <FileSpreadsheet size={18} style={{ color: alpha('#fff', 0.3) }} />
+                                                    <FileSpreadsheet size={18} style={{ color: theme.palette.text.disabled }} />
                                                 )}
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.text.primary }}>
                                                     {aiData.improved_statement || row.original_data.statement}
                                                 </Typography>
                                             </Box>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                                 {aiData.suggested_category || row.original_data.category}
                                             </Typography>
                                         </TableCell>
@@ -513,7 +517,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                             )}
                                         </TableCell>
                                         <TableCell align="right">
-                                            <IconButton size="small" sx={{ color: alpha('#fff', 0.2) }}>
+                                            <IconButton size="small" sx={{ color: 'text.disabled' }}>
                                                 <MoreVertical size={16} />
                                             </IconButton>
                                         </TableCell>
@@ -535,10 +539,10 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                 PaperProps={{
                     sx: {
                         borderRadius: 4,
-                        bgcolor: '#0f172a',
+                        bgcolor: theme.palette.mode === 'dark' ? '#0f172a' : '#ffffff',
                         backgroundImage: 'none',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        boxShadow: '0 24px 48px rgba(0,0,0,0.5)'
+                        border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'}`,
+                        boxShadow: theme.palette.mode === 'dark' ? '0 24px 48px rgba(0,0,0,0.5)' : '0 12px 32px rgba(0,0,0,0.15)'
                     }
                 }}
                 BackdropProps={{
@@ -548,19 +552,19 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                 {currentRisk && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
                         {/* Header */}
-                        <Box sx={{ p: 4, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box sx={{ p: 4, borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <Box>
                                 <Typography variant="overline" sx={{ color: '#8b5cf6', fontWeight: 800, letterSpacing: 2 }}>
                                     INTELLIGENCE UNIT R-42
                                 </Typography>
-                                <Typography variant="h4" fontWeight="900" sx={{ mt: 1, mb: 1, letterSpacing: '-0.02em', color: '#fff' }}>
+                                <Typography variant="h4" fontWeight="900" sx={{ mt: 1, mb: 1, letterSpacing: '-0.02em', color: theme.palette.text.primary }}>
                                     {currentRisk.ai_analysis?.improved_statement || currentRisk.original_data.statement}
                                 </Typography>
                                 <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
                                     <Chip
                                         label={currentRisk.ai_analysis?.suggested_category || currentRisk.original_data.category}
                                         size="small"
-                                        sx={{ bgcolor: alpha('#fff', 0.05), color: alpha('#fff', 0.6), fontWeight: 700, px: 1 }}
+                                        sx={{ bgcolor: alpha(theme.palette.text.primary, 0.06), fontWeight: 700, px: 1 }}
                                     />
                                     <Box sx={{
                                         display: 'inline-flex', alignItems: 'center', gap: 1, px: 2, py: 0.5, borderRadius: '6px',
@@ -579,26 +583,26 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                     )}
                                 </Stack>
                             </Box>
-                            <IconButton onClick={() => setDrawerOpen(false)} sx={{ bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                                <X size={20} color="white" />
+                            <IconButton onClick={() => setDrawerOpen(false)} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05), '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.1) } }}>
+                                <X size={20} />
                             </IconButton>
                         </Box>
 
                         <DialogContent sx={{ p: 4 }}>
                             <Stack spacing={4}>
                                 <Box>
-                                    <Typography variant="subtitle2" sx={{ color: alpha('#fff', 0.4), mb: 2, fontWeight: 800, letterSpacing: '0.05em' }}>DESCRIPTION REFINEMENT</Typography>
+                                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 800, letterSpacing: '0.05em' }}>DESCRIPTION REFINEMENT</Typography>
                                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="stretch">
-                                        <Paper elevation={0} sx={{ flex: 1, p: 2.5, bgcolor: alpha('#fff', 0.03), border: '1px solid rgba(255,255,255,0.05)', borderRadius: 2 }}>
-                                            <Typography variant="caption" display="block" sx={{ color: alpha('#fff', 0.3), fontWeight: 700, mb: 1 }}>ORIGINAL</Typography>
-                                            <Typography variant="body2" sx={{ color: alpha('#fff', 0.7), lineHeight: 1.6 }}>
+                                        <Paper elevation={0} sx={{ flex: 1, p: 2.5, bgcolor: 'action.hover', border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                                            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', fontWeight: 700, mb: 1 }}>ORIGINAL</Typography>
+                                            <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.6 }}>
                                                 {currentRisk.original_data.description || 'No description provided.'}
                                             </Typography>
                                         </Paper>
 
                                         {currentRisk.ai_analysis?.improved_description && (
                                             <>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: alpha('#fff', 0.2) }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.disabled' }}>
                                                     <ArrowRight size={20} />
                                                 </Box>
                                                 <Paper elevation={0} sx={{
@@ -609,7 +613,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                                         <Zap size={14} style={{ color: '#8b5cf6' }} />
                                                         <Typography variant="caption" sx={{ color: '#8b5cf6', fontWeight: 800 }}>AI ENHANCED</Typography>
                                                     </Box>
-                                                    <Typography variant="body2" sx={{ color: '#fff', lineHeight: 1.6 }}>
+                                                    <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.6 }}>
                                                         {currentRisk.ai_analysis.improved_description}
                                                     </Typography>
                                                 </Paper>
@@ -618,12 +622,12 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                     </Stack>
                                 </Box>
 
-                                <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                                <Divider />
 
                                 <Box>
-                                    <Typography variant="subtitle2" sx={{ color: alpha('#fff', 0.4), mb: 2, fontWeight: 800, letterSpacing: '0.05em' }}>STRATEGIC CONTEXT</Typography>
+                                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 800, letterSpacing: '0.05em' }}>STRATEGIC CONTEXT</Typography>
                                     {!currentRisk.ai_analysis?.score_analysis?.financial_impact_estimate && !currentRisk.ai_analysis?.score_analysis?.why_matters ? (
-                                        <Alert severity="info" sx={{ bgcolor: alpha('#3b82f6', 0.1), color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                                        <Alert severity="info">
                                             Analysis unavailable for this item.
                                         </Alert>
                                     ) : (
@@ -633,9 +637,9 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                                     <Box sx={{ p: 0.8, borderRadius: 1.5, bgcolor: alpha('#6366f1', 0.1), color: '#6366f1', display: 'flex' }}>
                                                         <Shield size={16} />
                                                     </Box>
-                                                    <Typography variant="subtitle2" fontWeight={800} color="#fff">Why It Matters</Typography>
+                                                    <Typography variant="subtitle2" fontWeight={800}>Why It Matters</Typography>
                                                 </Box>
-                                                <Typography variant="body2" sx={{ color: alpha('#fff', 0.5), lineHeight: 1.6 }}>
+                                                <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
                                                     {currentRisk.ai_analysis.score_analysis.why_matters}
                                                 </Typography>
                                             </Box>
@@ -644,9 +648,9 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                                     <Box sx={{ p: 0.8, borderRadius: 1.5, bgcolor: alpha('#f59e0b', 0.1), color: '#f59e0b', display: 'flex' }}>
                                                         <BarChart3 size={16} />
                                                     </Box>
-                                                    <Typography variant="subtitle2" fontWeight={800} color="#fff">Estimated Impact</Typography>
+                                                    <Typography variant="subtitle2" fontWeight={800}>Estimated Impact</Typography>
                                                 </Box>
-                                                <Typography variant="body2" sx={{ color: alpha('#fff', 0.5), lineHeight: 1.6 }}>
+                                                <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
                                                     {currentRisk.ai_analysis.score_analysis.financial_impact_estimate}
                                                 </Typography>
                                             </Box>
@@ -656,10 +660,10 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                             </Stack>
                         </DialogContent>
 
-                        <DialogActions sx={{ p: 4, borderTop: '1px solid rgba(255,255,255,0.05)', justifyContent: 'space-between', bgcolor: 'rgba(0,0,0,0.2)' }}>
+                        <DialogActions sx={{ p: 4, borderTop: `1px solid ${theme.palette.divider}`, justifyContent: 'space-between' }}>
                             <Button
                                 onClick={() => setDrawerOpen(false)}
-                                sx={{ color: alpha('#fff', 0.4), fontWeight: 700, textTransform: 'none' }}
+                                sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}
                             >
                                 Dismiss
                             </Button>
@@ -710,7 +714,7 @@ const AIAnalysisDashboard: React.FC<AIAnalysisDashboardProps> = ({
                                             delete newDecisions[drawerRiskIndex!];
                                             setFinalDecisions({ ...finalDecisions, row_decisions: newDecisions });
                                         }}
-                                        sx={{ borderRadius: '10px', px: 3, color: alpha('#fff', 0.6), borderColor: 'rgba(255,255,255,0.1)', fontWeight: 700, textTransform: 'none' }}
+                                        sx={{ borderRadius: '10px', px: 3, fontWeight: 700, textTransform: 'none' }}
                                     >
                                         Undo {currentDecision ? 'Acceptance' : 'Rejection'}
                                     </Button>

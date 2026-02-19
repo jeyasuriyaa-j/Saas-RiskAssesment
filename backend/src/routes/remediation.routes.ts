@@ -54,7 +54,7 @@ router.get('/risk/:riskId', asyncHandler(async (req: AuthRequest, res: Response)
  * Get all assigned tasks for a specific risk (for Risk Managers)
  * GET /api/v1/remediation/risk/:riskId/assigned-tasks
  */
-router.get('/risk/:riskId/assigned-tasks', authorize('admin', 'risk_manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/risk/:riskId/assigned-tasks', asyncHandler(async (req: AuthRequest, res: Response) => {
     const { tenantId } = req.user!;
     const { riskId: paramRiskId } = req.params;
 

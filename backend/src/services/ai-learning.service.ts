@@ -25,7 +25,7 @@ export const getLearningRecommendations = async (tenantId: string): Promise<Lear
             FROM risks r
             JOIN ai_suggestions sug ON r.risk_id = sug.risk_id
             JOIN events e ON sug.event_id = e.event_id
-            WHERE r.tenant_id = $1 AND e.created_at > NOW() - INTERVAL '30 days'
+            WHERE r.tenant_id = $1 AND e.reported_at > NOW() - INTERVAL '30 days'
             GROUP BY r.risk_id
             HAVING COUNT(e.event_id) >= 2
         `, [tenantId]);
@@ -49,13 +49,13 @@ export const getLearningRecommendations = async (tenantId: string): Promise<Lear
             SELECT 
                 c.control_id, 
                 c.control_name, 
-                c.effectiveness_score,
+                c.effectiveness_percent as effectiveness_score,
                 COUNT(e.event_id) as incident_count
             FROM controls c
-            JOIN risk_controls rc ON c.control_id = rc.control_id
+            JOIN risk_control_mappings rc ON c.control_id = rc.control_id
             JOIN ai_suggestions sug ON rc.risk_id = sug.risk_id
             JOIN events e ON sug.event_id = e.event_id
-            WHERE c.tenant_id = $1 AND e.created_at > NOW() - INTERVAL '30 days'
+            WHERE c.tenant_id = $1 AND e.reported_at > NOW() - INTERVAL '30 days'
             GROUP BY c.control_id
         `, [tenantId]);
 

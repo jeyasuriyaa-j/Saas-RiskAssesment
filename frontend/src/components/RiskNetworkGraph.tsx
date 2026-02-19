@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Box, Card, CardContent, Typography, CircularProgress, useTheme } from '@mui/material';
+import { Box, CircularProgress, useTheme } from '@mui/material';
 import { riskAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -29,7 +29,7 @@ export default function RiskNetworkGraph() {
     const fgRef = useRef<any>();
     const [data, setData] = useState<GraphData>({ nodes: [], links: [] });
     const [loading, setLoading] = useState(true);
-    const [dimensions, setDimensions] = useState({ w: 800, h: 500 });
+    const [dimensions, setDimensions] = useState({ w: 800, h: 460 });
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -38,7 +38,7 @@ export default function RiskNetworkGraph() {
             if (containerRef.current) {
                 setDimensions({
                     w: containerRef.current.clientWidth,
-                    h: 500
+                    h: containerRef.current.clientHeight || 460
                 });
             }
         };
@@ -75,12 +75,23 @@ export default function RiskNetworkGraph() {
                 risk_score: r.inherent_risk_score
             }));
 
-            const links: GraphLink[] = (analysis.correlations || []).map((c: any) => ({
-                source: c.source_risk_id,
-                target: c.target_risk_id,
-                value: c.strength * 5, // Visual thickness
-                type: c.relationship_type
-            }));
+            const links: GraphLink[] = (analysis.correlations || [])
+                .map((c: any) => ({
+                    source: c.source_risk_id,
+                    target: c.target_risk_id,
+                    value: c.strength * 5, // Visual thickness
+                    type: c.relationship_type
+                }))
+                .filter((link: GraphLink) => {
+                    // Only include links where both source and target nodes exist
+                    const sourceExists = nodes.some(n => n.id === link.source);
+                    const targetExists = nodes.some(n => n.id === link.target);
+                    if (!sourceExists || !targetExists) {
+                        console.warn(`Skipping link with missing node: ${link.source} -> ${link.target}`);
+                        return false;
+                    }
+                    return true;
+                });
 
             setData({ nodes, links });
 
@@ -111,41 +122,27 @@ export default function RiskNetworkGraph() {
     // Prepare container style for Dark/Light mode
     const isDark = theme.palette.mode === 'dark';
     const bgColor = isDark ? '#0f172a' : '#ffffff';
-    const textColor = isDark ? '#e2e8f0' : '#1e293b';
 
     if (loading) return <Box p={4} textAlign="center"><CircularProgress /></Box>;
 
     return (
-        <Card className="glass fade-in hover-lift" sx={{ height: '100%', overflow: 'hidden' }}>
-            <CardContent sx={{ p: 0, height: '100%', position: 'relative' }}>
-                <Box p={2} sx={{ position: 'absolute', top: 0, left: 0, zIndex: 10, pointerEvents: 'none' }}>
-                    <Typography variant="h6" fontWeight="bold" sx={{ color: textColor }}>
-                        Risk Correlation Network
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        AI-Detected Cause & Effect Relationships
-                    </Typography>
-                </Box>
-
-                <div ref={containerRef} style={{ width: '100%', height: '500px' }}>
-                    <ForceGraph2D
-                        ref={fgRef}
-                        width={dimensions.w}
-                        height={dimensions.h}
-                        graphData={data}
-                        backgroundColor={bgColor}
-                        nodeLabel="name"
-                        nodeColor="color"
-                        nodeRelSize={6}
-                        linkColor={() => isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}
-                        linkWidth="value"
-                        linkDirectionalParticles={2}
-                        linkDirectionalParticleSpeed={(d: any) => d.value * 0.001}
-                        onNodeClick={handleNodeClick}
-                        cooldownTicks={100}
-                    />
-                </div>
-            </CardContent>
-        </Card>
+        <Box ref={containerRef} sx={{ width: '100%', height: '100%', minHeight: '460px' }}>
+            <ForceGraph2D
+                ref={fgRef}
+                width={dimensions.w}
+                height={dimensions.h}
+                graphData={data}
+                backgroundColor={bgColor}
+                nodeLabel="name"
+                nodeColor="color"
+                nodeRelSize={6}
+                linkColor={() => isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}
+                linkWidth="value"
+                linkDirectionalParticles={2}
+                linkDirectionalParticleSpeed={(d: any) => d.value * 0.001}
+                onNodeClick={handleNodeClick}
+                cooldownTicks={100}
+            />
+        </Box>
     );
 }
