@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Typography,
@@ -76,6 +77,14 @@ export default function RiskList() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const { user } = useAuth();
+    const navigate = useNavigate();
+
+    // RESTRICT ACCESS: Redirect standard users to dashboard
+    useEffect(() => {
+        if (user && user.role === 'user') {
+            navigate('/dashboard');
+        }
+    }, [user, navigate]);
 
     const [risks, setRisks] = useState<Risk[]>([]);
     const [loading, setLoading] = useState(true);

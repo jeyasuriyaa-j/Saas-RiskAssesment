@@ -460,19 +460,19 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                             variant="outlined"
                             color="error"
                             onClick={() => setOpenDeleteDialog(true)}
-                            disabled={user?.role === 'viewer' || user?.role === 'auditor'}
+                            disabled={user?.role === 'viewer' || user?.role === 'auditor' || user?.role === 'user'}
                         >
                             Delete Risk
                         </Button>
                     )}
-                    {!isEditing ? (
+                    {!isEditing && user?.role !== 'user' ? (
                         <Button variant="contained" onClick={() => setIsEditing(true)}>Edit Risk</Button>
-                    ) : (
+                    ) : isEditing ? (
                         <Box sx={{ display: 'flex', gap: 1 }}>
                             <Button variant="outlined" onClick={() => setIsEditing(false)}>Cancel</Button>
                             <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Save Changes</Button>
                         </Box>
-                    )}
+                    ) : null}
                 </Box>
             </Box>
 
@@ -489,8 +489,8 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                 <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
                     <Tab label="Details" />
-                    <Tab label="Controls & Remediation" disabled={riskId === 'new'} />
-                    <Tab label="History" disabled={riskId === 'new'} />
+                    {user?.role !== 'user' && <Tab label="Controls & Remediation" disabled={riskId === 'new'} />}
+                    {user?.role !== 'user' && <Tab label="History" disabled={riskId === 'new'} />}
                 </Tabs>
             </Box>
 

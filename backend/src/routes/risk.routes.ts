@@ -169,6 +169,15 @@ router.get('/:riskId', asyncHandler(async (req: AuthRequest, res: Response) => {
     // Build query with cross-tenant access for assigned users
     // Admins/Risk Managers can see all risks in their tenant
     // Users can see risks in their tenant OR risks they have assigned tasks for
+    const params = [riskId, tenantId, req.user!.userId];
+
+    // Build query with cross-tenant access for assigned users
+    // Admins/Risk Managers can see all risks in their tenant
+    // Users can see risks in their tenant OR risks they have assigned tasks for
+    // We check:
+    // 1. Risk is in user's tenant
+    // 2. OR Risk is owned by user
+    // 3. OR Risk is assigned to user
     let query_text = `
         SELECT 
           r.*,
@@ -176,9 +185,12 @@ router.get('/:riskId', asyncHandler(async (req: AuthRequest, res: Response) => {
           u.full_name as owner_name
          FROM risks r
          LEFT JOIN users u ON r.owner_user_id = u.user_id
-         WHERE ${idColumn} = $1 AND r.tenant_id = $2`;
-
-    const params = [riskId, tenantId];
+         WHERE ${idColumn} = $1 
+         AND (
+            r.tenant_id = $2 
+            OR r.owner_user_id = $3 
+            OR $3 = ANY(r.current_assignee_ids)
+         )`;
 
     const result = await query(query_text, params);
 
@@ -224,6 +236,26 @@ router.get('/:riskId', asyncHandler(async (req: AuthRequest, res: Response) => {
 
     // Get history (audit trail) using the dedicated auditService
     const history = await auditService.getHistory(risk.risk_id, tenantId);
+
+    // Format response for RiskDetail.tsx
+    // RESTRICTION FOR STANDARD USERS
+    // If role is 'user', do NOT return sensitive details (controls, remediation, compliance, history)
+    if (req.user!.role === 'user') {
+        res.json({
+            ...risk,
+            risk_id: risk.risk_code,
+            statement: risk.statement,
+            likelihood_score: risk.likelihood_score || 0,
+            impact_score: risk.impact_score || 0,
+            inherent_risk_score: risk.inherent_risk_score || 0,
+            controls: [],
+            remediation_plans: [],
+            compliance_mappings: [],
+            history: [],
+            audit_trail: []
+        });
+        return;
+    }
 
     // Format response for RiskDetail.tsx
     res.json({
@@ -281,8 +313,10 @@ router.post('/:id/assign', authorize('manager', 'admin', 'risk_manager'), asyncH
         const riskId = risk.risk_id;
 
         // Update risk with assignment tracking
+        // Update risk with assignment tracking - using array for future proofing, allowing single assignee for now
+        // We replace the array or append? For now let's assume single assignee workflow
         await query(
-            'UPDATE risks SET assigned_to = $1, assigned_at = CURRENT_TIMESTAMP WHERE risk_id = $2',
+            'UPDATE risks SET current_assignee_ids = ARRAY[$1]::uuid[], updated_at = CURRENT_TIMESTAMP WHERE risk_id = $2',
             [assignee_id, riskId]
         );
 
