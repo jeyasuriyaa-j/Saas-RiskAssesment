@@ -7,8 +7,15 @@ import { createTaskCompletionNotification } from '../services/notification.servi
 
 const router = Router();
 
-// All routes require authentication (any authenticated role can see their own assigned tasks)
+// All routes require authentication and specific roles
 router.use(authenticate);
+router.use((req: AuthRequest, _res: Response, next) => {
+    const role = req.user?.role?.toLowerCase();
+    if (role !== 'user' && role !== 'admin') {
+        throw new AppError('Access denied. This page is only for standard users and administrators.', 403);
+    }
+    next();
+});
 
 /**
  * GET /api/v1/my-risks/dashboard

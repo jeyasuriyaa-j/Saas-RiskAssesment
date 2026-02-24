@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
 import { useThemeMode } from '../contexts/ThemeModeContext';
 
-const InteractiveBackground = ({ children }: { children: React.ReactNode }) => {
+const InteractiveBackground = ({ children, disableScroll = false }: { children: React.ReactNode, disableScroll?: boolean }) => {
     const interactiveRef = useRef<HTMLDivElement>(null);
     const { mode } = useThemeMode();
 
@@ -37,20 +37,22 @@ const InteractiveBackground = ({ children }: { children: React.ReactNode }) => {
 
     // Gradients matching Layout.tsx sidebar but lighter for background
     const backgroundGradient = mode === 'light'
-        ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' // Slightly cooler/darker grey for better contrast
+        ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
         : 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)';
 
     const cursorGradient = mode === 'light'
-        ? 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0) 70%)' // Indigo hint for cursor
+        ? 'radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0) 70%)'
         : 'radial-gradient(circle, rgba(139, 92, 246, 0.8) 0%, rgba(59, 130, 246, 0) 70%)';
 
     return (
         <Box
             sx={{
-                position: 'relative',
+                position: 'fixed', // Changed from relative to fixed if disableScroll is true to prevent overall scroll
+                top: 0,
+                left: 0,
                 width: '100vw',
                 height: '100vh',
-                overflowY: 'auto',
+                overflowY: disableScroll ? 'hidden' : 'auto',
                 overflowX: 'hidden',
                 background: backgroundGradient,
                 transition: 'background 0.5s ease',
@@ -146,11 +148,12 @@ const InteractiveBackground = ({ children }: { children: React.ReactNode }) => {
                     position: 'relative',
                     zIndex: 2,
                     width: '100%',
-                    minHeight: '100vh',
+                    height: disableScroll ? '100vh' : 'auto',
+                    minHeight: disableScroll ? '100vh' : '100vh',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    py: 4,
+                    py: disableScroll ? 0 : 4,
                 }}
             >
                 {children}

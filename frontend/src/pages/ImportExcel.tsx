@@ -347,7 +347,7 @@ export default function ImportExcel() {
             if (shouldStop) {
                 clearInterval(intervalId);
             }
-        }, 500);
+        }, 2000); // 2 seconds to avoid rate limiting (429)
 
         return () => clearInterval(intervalId);
     }, [jobId, activeStep, uploadStatus]);
@@ -406,7 +406,7 @@ export default function ImportExcel() {
                             : 'Processing failed';
                         throw new Error(detailedError);
                     }
-                    await new Promise(r => setTimeout(r, 1000));
+                    await new Promise(r => setTimeout(r, 500)); // Faster polling for mapping
                     attempts++;
                 }
                 throw new Error('Timeout waiting for AI mapping');
@@ -549,13 +549,13 @@ export default function ImportExcel() {
                                     </Box>
                                     <Typography variant="h5" fontWeight="800" gutterBottom sx={{ letterSpacing: '-0.02em' }}>
                                         {uploadStatus === 'uploading' && 'Streaming to Cloud...'}
-                                        {uploadStatus === 'processing' && 'Extracting Intelligence...'}
-                                        {uploadStatus === 'analyzing' && 'AI Neural Processing...'}
+                                        {uploadStatus === 'processing' && 'Analyzing Structure & Dupes...'}
+                                        {uploadStatus === 'analyzing' && 'AI Deep Analysis Neural Pass...'}
                                     </Typography>
                                     <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 400, mx: 'auto' }}>
                                         {uploadStatus === 'uploading' && `Payload transfer in progress. Please wait.`}
-                                        {uploadStatus === 'processing' && 'Our engine is parsing your risk structure...'}
-                                        {uploadStatus === 'analyzing' && 'Large Language Model is identifying and improving risks...'}
+                                        {uploadStatus === 'processing' && 'Our engine is parsing structure, validating data, and detecting duplicates in parallel...'}
+                                        {uploadStatus === 'analyzing' && 'Adaptive batch analyzer is now refining and scoring rows...'}
                                     </Typography>
                                 </Box>
                             ) : (

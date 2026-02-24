@@ -6,7 +6,7 @@ An AI-powered Enterprise Risk Management (ERM) SaaS platform designed for high-p
 
 ### Prerequisites
 - **Node.js**: v18 or higher
-- **PostgreSQL**: v14 or higher (Running on Port 9000 by default in this config)
+- **PostgreSQL**: v14 or higher (Running on Port 5432 by default)
 - **Redis**: Required for batch processing
 - **OpenRouter/OpenAI API Key**: For AI-driven analysis
 
@@ -26,12 +26,18 @@ An AI-powered Enterprise Risk Management (ERM) SaaS platform designed for high-p
 4. Click **Save Changes**.
 
 ### Option 2: Environment Variables (.env)
-Use the `backend/.env.example` as a template for your `backend/.env` file:
+Use the `backend/.env.example` as a template for your `backend/.env` file.
+**IMPORTANT**: Generate secure local secrets for JWT by running:
+```bash
+node scripts/generate-secrets.js
+```
+Copy the output into your `.env`.
+
 - `OPENROUTER_API_KEY`: Your OpenRouter API Key
 - `AI_MODEL`: Set to `openrouter/aurora-alpha` (Default)
 
 **Frontend**:
-- `VITE_API_URL`: Backend API URL (default: http://localhost:5000/api/v1)
+- `REACT_APP_API_URL`: Backend API URL (default: http://localhost:5000/api/v1)
 
 ## 📖 Key Features
 - **AI Import**: High-speed batch analysis of Excel/CSV risk sheets.

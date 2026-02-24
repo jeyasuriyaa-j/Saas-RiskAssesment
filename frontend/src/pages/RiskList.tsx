@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box,
@@ -16,7 +16,6 @@ import {
     TableRow,
     Paper,
     useTheme,
-    Drawer,
     Tooltip,
     Fade,
     alpha,
@@ -35,7 +34,8 @@ import {
     Chip,
     Dialog,
     DialogContent,
-    DialogActions
+    DialogActions,
+    Grow
 } from '@mui/material';
 import {
     Plus,
@@ -117,25 +117,7 @@ export default function RiskList() {
     const canViewAll = isAdmin || isAuditorOrViewer;
     const canManageRisks = isAdmin;
 
-    useEffect(() => {
-        loadRisks();
-    }, []);
-
-    // Enforce "All Risks" for Admins on mount to avoid confusion
-    useEffect(() => {
-        if (canViewAll) {
-            setCurrentTab(0);
-        }
-    }, [canViewAll]);
-
-    // Set default tab based on role
-    useEffect(() => {
-        if (!canViewAll && currentTab === 0) {
-            setCurrentTab(1); // Default to "My Department" for regular users
-        }
-    }, [canViewAll, currentTab]);
-
-    const loadRisks = async () => {
+    const loadRisks = useCallback(async () => {
         setLoading(true);
         try {
             const params: any = search ? { search } : {};
@@ -150,12 +132,17 @@ export default function RiskList() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [search, currentTab]); // Added search and currentTab as dependencies for loadRisks
 
-    // Ensure we reload when tab changes
     useEffect(() => {
         loadRisks();
-    }, [currentTab]);
+    }, [loadRisks]); // Added loadRisks to dependency array
+
+    // Ensure we reload when tab changes - this is now redundant with loadRisks in useEffect[loadRisks]
+    // but we can keep it for clarity if needed, or remove it. Let's update it.
+    useEffect(() => {
+        loadRisks();
+    }, [loadRisks]);
 
 
     const filteredRisks = useMemo(() => {
@@ -209,7 +196,7 @@ export default function RiskList() {
         });
 
         return result;
-    }, [risks, currentTab, search, user, filterCategory, filterSeverity, filterDepartment, sortBy, sortOrder]);
+    }, [risks, currentTab, search, user, filterCategory, filterSeverity, filterDepartment, filterStatus, sortBy, sortOrder]);
 
     const handleSelectRisk = (riskId: string) => {
         setSelectedRisks(prev =>
@@ -257,21 +244,51 @@ export default function RiskList() {
     };
 
     const getStatusStyle = (status: string) => {
-        switch (status?.toUpperCase()) {
+        const s = status?.toUpperCase();
+        switch (s) {
             case 'IDENTIFIED':
-                return { bg: alpha('#3b82f6', 0.1), text: '#60a5fa', border: alpha('#3b82f6', 0.2), glow: '#3b82f6' };
+                return {
+                    bg: alpha(theme.palette.info.main, 0.1),
+                    text: theme.palette.info.main,
+                    border: alpha(theme.palette.info.main, 0.2),
+                    glow: theme.palette.mode === 'dark' ? theme.palette.info.main : 'none'
+                };
             case 'ASSESSED':
-                return { bg: alpha('#8b5cf6', 0.1), text: '#a78bfa', border: alpha('#8b5cf6', 0.2), glow: '#8b5cf6' };
+                return {
+                    bg: alpha(theme.palette.primary.main, 0.1),
+                    text: theme.palette.primary.main,
+                    border: alpha(theme.palette.primary.main, 0.2),
+                    glow: theme.palette.mode === 'dark' ? theme.palette.primary.main : 'none'
+                };
             case 'IN_PROGRESS':
-                return { bg: alpha('#f59e0b', 0.1), text: '#fbbf24', border: alpha('#f59e0b', 0.2), glow: '#f59e0b' };
+                return {
+                    bg: alpha(theme.palette.warning.main, 0.1),
+                    text: theme.palette.warning.main,
+                    border: alpha(theme.palette.warning.main, 0.2),
+                    glow: theme.palette.mode === 'dark' ? theme.palette.warning.main : 'none'
+                };
             case 'MITIGATED':
-                return { bg: alpha('#10b981', 0.1), text: '#34d399', border: alpha('#10b981', 0.2), glow: '#10b981' };
-            case 'CLOSED':
-                return { bg: alpha('#6b7280', 0.1), text: '#9ca3af', border: alpha('#6b7280', 0.2), glow: 'none' };
             case 'ACTIVE':
-                return { bg: alpha('#10b981', 0.1), text: '#34d399', border: alpha('#10b981', 0.2), glow: '#10b981' };
+                return {
+                    bg: alpha(theme.palette.success.main, 0.1),
+                    text: theme.palette.success.main,
+                    border: alpha(theme.palette.success.main, 0.2),
+                    glow: theme.palette.mode === 'dark' ? theme.palette.success.main : 'none'
+                };
+            case 'CLOSED':
+                return {
+                    bg: alpha(theme.palette.text.disabled, 0.1),
+                    text: theme.palette.text.secondary,
+                    border: alpha(theme.palette.text.disabled, 0.2),
+                    glow: 'none'
+                };
             default:
-                return { bg: alpha('#fff', 0.05), text: alpha('#fff', 0.5), border: alpha('#fff', 0.1), glow: 'none' };
+                return {
+                    bg: theme.palette.action.hover,
+                    text: theme.palette.text.secondary,
+                    border: theme.palette.divider,
+                    glow: 'none'
+                };
         }
     };
 
@@ -343,279 +360,277 @@ export default function RiskList() {
             position: 'relative',
             overflow: 'hidden',
         }}>
-            {/* Header Area */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" px={1} mb={1}>
-                <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5 }}
-                >
-                    <Box>
-                        <Typography variant="h4" fontWeight="800" sx={{
-                            background: theme.palette.mode === 'dark'
-                                ? 'linear-gradient(45deg, #fff 30%, #a5b4fc 90%)'
-                                : `linear-gradient(45deg, ${theme.palette.primary.dark} 30%, ${theme.palette.primary.main} 90%)`,
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            letterSpacing: '-0.02em',
-                            fontSize: '2rem'
-                        }}>
-                            Risk Register
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, fontWeight: 500 }}>
-                            {filteredRisks.length} active risks portfolio • {filteredRisks.filter(r => r.priority === 'CRITICAL').length} critical items
-                        </Typography>
-                    </Box>
-                </motion.div>
-                {canManageRisks && (
-                    <Button
-                        variant="contained"
-                        startIcon={<Plus size={18} />}
-                        onClick={() => {
-                            setViewingRiskId('new');
-                            setDrawerOpen(true);
-                        }}
-                        sx={{
-                            borderRadius: '12px',
-                            textTransform: 'none',
-                            px: isMobile ? 2 : 3,
-                            py: 1.2,
-                            fontWeight: 700,
-                            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                            boxShadow: '0 8px 20px -4px rgba(99, 102, 241, 0.4)',
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            '&:hover': {
-                                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                                transform: 'translateY(-2px)',
-                                boxShadow: '0 12px 24px -4px rgba(99, 102, 241, 0.5)',
-                            },
-                        }}
-                    >
-                        {isMobile ? 'Add' : 'Add Risk'}
-                    </Button>
-                )}
-            </Box>
-
-            {/* Glass Control Panel */}
-            <Paper elevation={0} sx={{
-                p: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                flexDirection: isMobile ? 'column' : 'row',
-                gap: 2,
-                background: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.2 : 0.8),
-                backdropFilter: 'blur(20px)',
-                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-                boxShadow: theme.palette.mode === 'light' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                borderRadius: '18px',
-                mx: 0.5,
-                mb: 1
+            {/* Sticky Header Section */}
+            <Box sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                bgcolor: theme.palette.mode === 'light' ? '#f1f5f9' : '#020617', // Match InteractiveBackground
+                pb: 1,
+                mx: -1.5,
+                px: 2.5,
+                pt: 1,
             }}>
-                <Tabs
-                    value={currentTab}
-                    variant={isMobile ? "fullWidth" : "standard"}
-                    onChange={(_, v) => setCurrentTab(v)}
-                    sx={{
-                        minHeight: 36,
-                        width: isMobile ? '100%' : 'auto',
-                        '& .MuiTabs-indicator': { display: 'none' },
-                        '& .MuiTab-root': {
-                            minHeight: 36,
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: '10px',
-                            minWidth: 'auto',
-                            px: 2,
-                            mr: isMobile ? 0 : 1,
-                            color: 'text.secondary',
-                            '&.Mui-selected': {
-                                color: 'text.primary',
-                                bgcolor: alpha(theme.palette.text.primary, 0.08),
-                            },
-                        }
-                    }}
-                >
-                    <Tab label={isMobile ? "All" : "All Risks"} disabled={!canViewAll} />
-                    <Tab label={isMobile ? "Dept" : "Department"} />
-                    <Tab label={isMobile ? "Mine" : "Assigned"} />
-                </Tabs>
-
-                {!isMobile && <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />}
-
-                <TextField
-                    placeholder={isMobile ? "Search..." : "Search risks..."}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    size="small"
-                    fullWidth={isMobile}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <Search size={16} style={{ color: theme.palette.text.secondary }} />
-                            </InputAdornment>
-                        ),
-                        sx: {
-                            borderRadius: '16px',
-                            bgcolor: alpha(theme.palette.text.primary, 0.03),
-                            '& fieldset': { border: 'none' },
-                            fontSize: '0.875rem',
-                            color: 'text.primary',
-                            '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.05) },
-                            transition: 'all 0.2s ease'
-                        }
-                    }}
-                    sx={{ width: isMobile ? '100%' : 320 }}
-                />
-
-                {!isMobile && <Box flexGrow={1} />}
-
-                <Stack direction="row" spacing={1} sx={{ width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
-                    <Tooltip title="Filters">
-                        <IconButton
-                            size="small"
-                            onClick={(e) => setAnchorElFilter(e.currentTarget)}
-                            sx={{
-                                bgcolor: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? alpha('#6366f1', 0.15) : alpha(theme.palette.text.primary, 0.04),
-                                border: `1px solid ${filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? alpha('#6366f1', 0.3) : alpha(theme.palette.divider, 0.5)}`,
-                                borderRadius: '10px',
-                                color: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? '#818cf8' : 'text.secondary'
-                            }}
-                        >
-                            <Filter size={18} />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Sort">
-                        <IconButton
-                            size="small"
-                            onClick={(e) => setAnchorElSort(e.currentTarget)}
-                            sx={{
-                                bgcolor: alpha(theme.palette.text.primary, 0.04),
-                                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-                                borderRadius: '10px',
-                                color: 'text.secondary',
-                                p: 1
-                            }}
-                        >
-                            <SlidersHorizontal size={18} />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
-
-                {/* Clear Filters Button (Visible if any filter is active or search exists) */}
-                {(filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' || search) && (
-                    <Button
-                        size="small"
-                        onClick={() => {
-                            setFilterCategory('ALL');
-                            setFilterSeverity('ALL');
-                            setFilterDepartment('ALL');
-                            setFilterStatus('ACTIVE');
-                            setSearch('');
-                            if (canViewAll) setCurrentTab(0);
-                        }}
-                        sx={{ ml: 1, textTransform: 'none', color: 'text.secondary' }}
+                {/* Header Area */}
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5 }}
                     >
-                        Clear Filters
-                    </Button>
-                )}
-
-                {/* Filter Menu */}
-                <Menu
-                    anchorEl={anchorElFilter}
-                    open={Boolean(anchorElFilter)}
-                    onClose={() => setAnchorElFilter(null)}
-                    PaperProps={{
-                        sx: {
-                            bgcolor: 'background.paper',
-                            border: `1px solid ${theme.palette.divider}`,
-                            borderRadius: '12px',
-                            minWidth: 180,
-                            mt: 1
-                        }
-                    }}
-                >
-                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Severity</Typography>
-                    {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => (
-                        <MenuItem
-                            key={s}
-                            onClick={() => { setFilterSeverity(s); setAnchorElFilter(null); }}
-                            selected={filterSeverity === s}
-                        >
-                            <ListItemText primary={s === 'ALL' ? 'All Severities' : s} />
-                        </MenuItem>
-                    ))}
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Department</Typography>
-                    {['ALL', ...Array.from(new Set(risks.filter(r => r.department).map(r => r.department)))].map(d => (
-                        <MenuItem
-                            key={d}
-                            onClick={() => { setFilterDepartment(d!); setAnchorElFilter(null); }}
-                            selected={filterDepartment === d}
-                        >
-                            <ListItemText primary={d === 'ALL' ? 'All Departments' : d} />
-                        </MenuItem>
-                    ))}
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Status</Typography>
-                    {[
-                        { id: 'ACTIVE', label: 'Active Risks' },
-                        { id: 'CLOSED', label: 'Closed Risks' },
-                        { id: 'ALL', label: 'All Statuses' }
-                    ].map(s => (
-                        <MenuItem
-                            key={s.id}
-                            onClick={() => { setFilterStatus(s.id); setAnchorElFilter(null); }}
-                            selected={filterStatus === s.id}
-                        >
-                            <ListItemText primary={s.label} />
-                        </MenuItem>
-                    ))}
-                    <Divider sx={{ my: 1 }} />
-                    <MenuItem onClick={() => { setFilterCategory('ALL'); setFilterSeverity('ALL'); setFilterDepartment('ALL'); setFilterStatus('ACTIVE'); setAnchorElFilter(null); }}>
-                        <ListItemText primary="Reset Filters" primaryTypographyProps={{ color: 'error' }} />
-                    </MenuItem>
-                </Menu>
-
-                {/* Sort Menu */}
-                <Menu
-                    anchorEl={anchorElSort}
-                    open={Boolean(anchorElSort)}
-                    onClose={() => setAnchorElSort(null)}
-                    PaperProps={{
-                        sx: {
-                            bgcolor: 'background.paper',
-                            border: `1px solid ${theme.palette.divider}`,
-                            borderRadius: '12px',
-                            minWidth: 180,
-                            mt: 1
-                        }
-                    }}
-                >
-                    {[
-                        { id: 'created_at', label: 'Recently Created' },
-                        { id: 'inherent_risk_score', label: 'Risk Score' },
-                        { id: 'statement', label: 'Risk Statement' },
-                        { id: 'priority', label: 'Severity' }
-                    ].map(s => (
-                        <MenuItem
-                            key={s.id}
+                        <Box>
+                            <Typography variant="h4" fontWeight="800" sx={{
+                                color: 'text.primary',
+                                letterSpacing: '-0.02em',
+                                fontSize: '2rem'
+                            }}>
+                                Risk Register
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, fontWeight: 600 }}>
+                                {filteredRisks.length} active risks portfolio • {filteredRisks.filter(r => r.priority === 'CRITICAL').length} critical items
+                            </Typography>
+                        </Box>
+                    </motion.div>
+                    {canManageRisks && (
+                        <Button
+                            variant="contained"
+                            startIcon={<Plus size={18} />}
                             onClick={() => {
-                                if (sortBy === s.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                                else { setSortBy(s.id); setSortOrder('desc'); }
-                                setAnchorElSort(null);
+                                setViewingRiskId('new');
+                                setDrawerOpen(true);
                             }}
-                            selected={sortBy === s.id}
+                            sx={{
+                                borderRadius: '10px',
+                                textTransform: 'none',
+                                px: isMobile ? 2 : 3,
+                                py: 1,
+                                fontWeight: 700,
+                            }}
                         >
-                            <ListItemText primary={s.label} />
-                            {sortBy === s.id && (
-                                <Typography variant="caption" sx={{ ml: 1, color: '#6366f1' }}>
-                                    {sortOrder === 'asc' ? '↑' : '↓'}
-                                </Typography>
-                            )}
+                            {isMobile ? 'Add' : 'Add Risk'}
+                        </Button>
+                    )}
+                </Box>
+
+                {/* Glass Control Panel */}
+                <Paper elevation={0} sx={{
+                    p: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    gap: 2,
+                    background: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.2) : theme.palette.background.paper,
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    boxShadow: theme.palette.mode === 'light' ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                    borderRadius: '14px',
+                }}>
+                    <Tabs
+                        value={currentTab}
+                        variant={isMobile ? "fullWidth" : "standard"}
+                        onChange={(_, v) => setCurrentTab(v)}
+                        sx={{
+                            minHeight: 36,
+                            width: isMobile ? '100%' : 'auto',
+                            '& .MuiTabs-indicator': { display: 'none' },
+                            '& .MuiTab-root': {
+                                minHeight: 36,
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                borderRadius: '10px',
+                                minWidth: 'auto',
+                                px: 2,
+                                mr: isMobile ? 0 : 1,
+                                color: 'text.secondary',
+                                '&.Mui-selected': {
+                                    color: 'text.primary',
+                                    bgcolor: alpha(theme.palette.text.primary, 0.08),
+                                },
+                            }
+                        }}
+                    >
+                        <Tab label={isMobile ? "All" : "All Risks"} disabled={!canViewAll} />
+                        <Tab label={isMobile ? "Dept" : "Department"} />
+                        <Tab label={isMobile ? "Mine" : "Assigned"} />
+                    </Tabs>
+
+                    {!isMobile && <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />}
+
+                    <TextField
+                        placeholder={isMobile ? "Search..." : "Search risks..."}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        size="small"
+                        fullWidth={isMobile}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search size={16} style={{ color: theme.palette.text.secondary }} />
+                                </InputAdornment>
+                            ),
+                            sx: {
+                                borderRadius: '12px',
+                                bgcolor: theme.palette.action.hover,
+                                '& fieldset': { border: 'none' },
+                                fontSize: '0.875rem',
+                                color: 'text.primary',
+                                transition: 'all 0.2s ease'
+                            }
+                        }}
+                        sx={{ width: isMobile ? '100%' : 320 }}
+                    />
+
+                    {!isMobile && <Box flexGrow={1} />}
+
+                    <Stack direction="row" spacing={1} sx={{ width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
+                        <Tooltip title="Filters">
+                            <IconButton
+                                size="small"
+                                onClick={(e) => setAnchorElFilter(e.currentTarget)}
+                                sx={{
+                                    bgcolor: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? alpha('#6366f1', 0.15) : alpha(theme.palette.text.primary, 0.04),
+                                    border: `1px solid ${filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? alpha('#6366f1', 0.3) : alpha(theme.palette.divider, 0.5)}`,
+                                    borderRadius: '10px',
+                                    color: filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' ? '#818cf8' : 'text.secondary'
+                                }}
+                            >
+                                <Filter size={18} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Sort">
+                            <IconButton
+                                size="small"
+                                onClick={(e) => setAnchorElSort(e.currentTarget)}
+                                sx={{
+                                    bgcolor: alpha(theme.palette.text.primary, 0.04),
+                                    border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                                    borderRadius: '10px',
+                                    color: 'text.secondary',
+                                    p: 1
+                                }}
+                            >
+                                <SlidersHorizontal size={18} />
+                            </IconButton>
+                        </Tooltip>
+                    </Stack>
+
+                    {/* Clear Filters Button (Visible if any filter is active or search exists) */}
+                    {(filterCategory !== 'ALL' || filterSeverity !== 'ALL' || filterDepartment !== 'ALL' || filterStatus !== 'ACTIVE' || search) && (
+                        <Button
+                            size="small"
+                            onClick={() => {
+                                setFilterCategory('ALL');
+                                setFilterSeverity('ALL');
+                                setFilterDepartment('ALL');
+                                setFilterStatus('ACTIVE');
+                                setSearch('');
+                                if (canViewAll) setCurrentTab(0);
+                            }}
+                            sx={{ ml: 1, textTransform: 'none', color: 'text.secondary' }}
+                        >
+                            Clear Filters
+                        </Button>
+                    )}
+
+                    {/* Filter Menu */}
+                    <Menu
+                        anchorEl={anchorElFilter}
+                        open={Boolean(anchorElFilter)}
+                        onClose={() => setAnchorElFilter(null)}
+                        PaperProps={{
+                            sx: {
+                                bgcolor: 'background.paper',
+                                border: `1px solid ${theme.palette.divider}`,
+                                borderRadius: '12px',
+                                minWidth: 180,
+                                mt: 1
+                            }
+                        }}
+                    >
+                        <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Severity</Typography>
+                        {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => (
+                            <MenuItem
+                                key={s}
+                                onClick={() => { setFilterSeverity(s); setAnchorElFilter(null); }}
+                                selected={filterSeverity === s}
+                            >
+                                <ListItemText primary={s === 'ALL' ? 'All Severities' : s} />
+                            </MenuItem>
+                        ))}
+                        <Divider sx={{ my: 1 }} />
+                        <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Department</Typography>
+                        {['ALL', ...Array.from(new Set(risks.filter(r => r.department).map(r => r.department)))].map(d => (
+                            <MenuItem
+                                key={d}
+                                onClick={() => { setFilterDepartment(d!); setAnchorElFilter(null); }}
+                                selected={filterDepartment === d}
+                            >
+                                <ListItemText primary={d === 'ALL' ? 'All Departments' : d} />
+                            </MenuItem>
+                        ))}
+                        <Divider sx={{ my: 1 }} />
+                        <Typography variant="overline" sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}>Status</Typography>
+                        {[
+                            { id: 'ACTIVE', label: 'Active Risks' },
+                            { id: 'CLOSED', label: 'Closed Risks' },
+                            { id: 'ALL', label: 'All Statuses' }
+                        ].map(s => (
+                            <MenuItem
+                                key={s.id}
+                                onClick={() => { setFilterStatus(s.id); setAnchorElFilter(null); }}
+                                selected={filterStatus === s.id}
+                            >
+                                <ListItemText primary={s.label} />
+                            </MenuItem>
+                        ))}
+                        <Divider sx={{ my: 1 }} />
+                        <MenuItem onClick={() => { setFilterCategory('ALL'); setFilterSeverity('ALL'); setFilterDepartment('ALL'); setFilterStatus('ACTIVE'); setAnchorElFilter(null); }}>
+                            <ListItemText primary="Reset Filters" primaryTypographyProps={{ color: 'error' }} />
                         </MenuItem>
-                    ))}
-                </Menu>
-            </Paper>
+                    </Menu>
+
+                    {/* Sort Menu */}
+                    <Menu
+                        anchorEl={anchorElSort}
+                        open={Boolean(anchorElSort)}
+                        onClose={() => setAnchorElSort(null)}
+                        PaperProps={{
+                            sx: {
+                                bgcolor: 'background.paper',
+                                border: `1px solid ${theme.palette.divider}`,
+                                borderRadius: '12px',
+                                minWidth: 180,
+                                mt: 1
+                            }
+                        }}
+                    >
+                        {[
+                            { id: 'created_at', label: 'Recently Created' },
+                            { id: 'inherent_risk_score', label: 'Risk Score' },
+                            { id: 'statement', label: 'Risk Statement' },
+                            { id: 'priority', label: 'Severity' }
+                        ].map(s => (
+                            <MenuItem
+                                key={s.id}
+                                onClick={() => {
+                                    if (sortBy === s.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                    else { setSortBy(s.id); setSortOrder('desc'); }
+                                    setAnchorElSort(null);
+                                }}
+                                selected={sortBy === s.id}
+                            >
+                                <ListItemText primary={s.label} />
+                                {sortBy === s.id && (
+                                    <Typography variant="caption" sx={{ ml: 1, color: '#6366f1' }}>
+                                        {sortOrder === 'asc' ? '↑' : '↓'}
+                                    </Typography>
+                                )}
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                </Paper>
+            </Box>
 
             {isMobile ? (
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', px: 1 }}>
@@ -701,25 +716,31 @@ export default function RiskList() {
                     '&::-webkit-scrollbar-track': { background: 'transparent' }
                 }}>
                     <Table stickyHeader size="small">
-                        <TableHead>
+                        <TableHead sx={{
+                            '& .MuiTableCell-head': {
+                                bgcolor: theme.palette.mode === 'light' ? '#f1f5f9' : '#020617',
+                                zIndex: 11,
+                                height: 50,
+                            }
+                        }}>
                             <TableRow>
-                                <TableCell padding="checkbox" sx={{ bgcolor: 'background.paper' }}>
+                                <TableCell padding="checkbox">
                                     <Checkbox
                                         size="small"
                                         indeterminate={selectedRisks.length > 0 && selectedRisks.length < filteredRisks.length}
                                         checked={filteredRisks.length > 0 && selectedRisks.length === filteredRisks.length}
                                         onChange={(e) => handleSelectAll(e.target.checked)}
-                                        sx={{ '&.Mui-checked': { color: '#6366f1' } }}
+                                        sx={{ '&.Mui-checked': { color: 'primary.main' } }}
                                     />
                                 </TableCell>
-                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID</TableCell>
-                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Risk Statement</TableCell>
-                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Department</TableCell>
-                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Owner</TableCell>
-                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Severity</TableCell>
-                                <TableCell sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</TableCell>
-                                <TableCell align="right" sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Score</TableCell>
-                                <TableCell align="center" sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: 60 }}></TableCell>
+                                <TableCell>ID</TableCell>
+                                <TableCell>Risk Statement</TableCell>
+                                <TableCell>Department</TableCell>
+                                <TableCell>Owner</TableCell>
+                                <TableCell>Severity</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell align="right">Score</TableCell>
+                                <TableCell align="center" sx={{ width: 60 }}></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -729,25 +750,18 @@ export default function RiskList() {
                                 <TableRow><TableCell colSpan={8} align="center" sx={{ py: 10, color: 'text.secondary' }}>No risks identified.</TableCell></TableRow>
                             ) : (
                                 <AnimatePresence>
-                                    {filteredRisks.map((risk, index) => (
+                                    {filteredRisks.map((risk) => (
                                         <TableRow
                                             component={motion.tr}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95 }}
-                                            transition={{ duration: 0.3 }}
+                                            transition={{ duration: 0.2 }}
                                             key={risk.risk_id}
                                             hover
                                             onClick={() => handleRowClick(risk.risk_id)}
                                             sx={{
                                                 cursor: 'pointer',
-                                                transition: 'all 0.15s ease-in-out',
-                                                bgcolor: index % 2 !== 0 ? alpha(theme.palette.text.primary, 0.02) : 'transparent',
-                                                '&:hover': {
-                                                    bgcolor: alpha('#6366f1', 0.06),
-                                                    '& td': { borderColor: alpha('#6366f1', 0.1) },
-                                                    boxShadow: 'inset 0 0 15px rgba(99, 102, 241, 0.05)'
-                                                },
                                                 height: 48,
                                                 '& td': {
                                                     py: 1, px: 2,
@@ -794,10 +808,10 @@ export default function RiskList() {
                                                 {(() => {
                                                     const p = risk.priority?.toUpperCase();
                                                     const colors: any = {
-                                                        CRITICAL: '#f43f5e',
-                                                        HIGH: '#f59e0b',
-                                                        MEDIUM: '#10b981',
-                                                        LOW: '#6366f1'
+                                                        CRITICAL: theme.palette.error.main,
+                                                        HIGH: theme.palette.warning.main,
+                                                        MEDIUM: theme.palette.info.main,
+                                                        LOW: theme.palette.primary.main
                                                     };
                                                     return (
                                                         <Box sx={{
@@ -839,7 +853,6 @@ export default function RiskList() {
                                                 <Typography sx={{
                                                     color: getRiskScoreColor(risk.inherent_risk_score),
                                                     fontWeight: 800, fontSize: '1rem',
-                                                    textShadow: `0 0 15px ${alpha(getRiskScoreColor(risk.inherent_risk_score), 0.4)}`,
                                                     letterSpacing: '-0.01em'
                                                 }}>
                                                     {risk.inherent_risk_score ? risk.inherent_risk_score.toFixed(1) : '-'}
@@ -881,26 +894,39 @@ export default function RiskList() {
             </Fade>
 
             {/* Detail Drawer */}
-            <Drawer
-                anchor="right"
+            <Dialog
                 open={drawerOpen}
                 onClose={handleCloseDrawer}
+                maxWidth="md"
+                fullWidth
+                TransitionComponent={Grow}
                 PaperProps={{
                     sx: {
-                        width: 800, maxWidth: '90vw',
                         bgcolor: 'background.paper',
-                        backdropFilter: 'blur(20px)',
-                        borderLeft: `1px solid ${theme.palette.divider}`,
-                        boxShadow: '-20px 0 50px rgba(0,0,0,0.2)'
+                        backdropFilter: 'blur(24px)',
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 4,
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                        maxHeight: '90vh',
+                        overflow: 'hidden',
+                        '&::-webkit-scrollbar': { display: 'none' }
                     }
                 }}
             >
                 {viewingRiskId && (
-                    <Box sx={{ height: '100%', overflowY: 'auto' }}>
+                    <Box
+                        className="no-scrollbar"
+                        sx={{
+                            height: '100%',
+                            overflowY: 'auto',
+                            '&::-webkit-scrollbar': { display: 'none' },
+                            'scrollbarWidth': 'none'
+                        }}
+                    >
                         <RiskDetail riskId={viewingRiskId} onClose={handleCloseDrawer} />
                     </Box>
                 )}
-            </Drawer>
+            </Dialog>
 
             {/* ROW ACTIONS MENU */}
             <Menu

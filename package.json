@@ -9,7 +9,7 @@
     "db:setup": "psql -d risk_assessment_db -f backend/src/database/schema.sql && cd backend && npm run seed",
     "start": "concurrently \"npm run dev --prefix backend\" \"npm start --prefix frontend\" \"npm run dev --prefix landing\"",
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm start --prefix frontend\" \"npm run dev --prefix landing\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm test --prefix backend"
   },
   "repository": {
     "type": "git",
@@ -30,6 +30,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.4",
+    "docx": "^9.5.3",
     "dotenv": "^17.2.3",
     "form-data": "^4.0.5",
     "xlsx": "^0.18.5"

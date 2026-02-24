@@ -78,14 +78,8 @@ const Dashboard = () => {
             <Card
                 className="premium-glass card-glow hover-lift"
                 sx={{
-                    border: mode === 'dark' ? 'none' : `1px solid ${alpha(iconColor, 0.1)}`,
-                    borderRadius: 4,
                     position: 'relative',
-                    overflow: 'hidden',
-                    background: mode === 'dark' ? `${alpha(iconColor, 0.08)} !important` : `${theme.palette.background.paper} !important`,
-                    boxShadow: mode === 'dark'
-                        ? `inset 0 0 20px ${alpha(iconColor, 0.05)}, 0 8px 32px 0 rgba(0, 0, 0, 0.2)`
-                        : `0 4px 20px 0 ${alpha(iconColor, 0.05)}`,
+                    overflow: 'hidden'
                 }}
             >
                 <CardContent sx={{ p: 3.5 }}>
@@ -154,9 +148,23 @@ const Dashboard = () => {
             mitigated: '#10b981',
             accepted: '#f59e0b',
             closed: '#3b82f6',
+            active: '#22c55e',
+            open: '#ef4444',
+            in_progress: '#f97316',
+            in_review: '#14b8a6',
         };
         return colors[status?.toLowerCase()] || '#94a3b8';
     };
+
+    const getStatusIcon = (status: string) => {
+        const s = status?.toLowerCase();
+        if (s === 'mitigated' || s === 'closed') return '✓';
+        if (s === 'identified') return '⚑';
+        if (s === 'assessed') return '⊙';
+        if (s === 'accepted') return '⌀';
+        return '○';
+    };
+
 
     return (
         <Box className="fade-in" sx={{ pb: 10 }}>
@@ -249,28 +257,29 @@ const Dashboard = () => {
                 </Grid>
 
                 {/* Row 3: Mid-Tier Visualization & Analytics */}
-                <Grid item xs={12} md={12} lg={6}>
+                <Grid item xs={12} md={12} lg={6} sx={{ display: 'flex', minWidth: 0 }}>
                     <Box className="premium-glass card-glow" sx={{
+                        width: '100%',
+                        minWidth: 0,
                         p: { xs: 2, sm: 3, md: 4 },
                         height: { xs: 'auto', md: '600px' },
                         minHeight: { xs: '400px', md: '600px' },
                         display: 'flex',
                         flexDirection: 'column',
-                        overflow: 'hidden', // Contain the graph nodes
-                        position: 'relative'
+                        overflow: 'hidden'
                     }}>
                         <Stack direction="row" alignItems="center" spacing={2} mb={{ xs: 2, md: 4 }}>
-                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1), display: 'flex' }}>
+                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Brain size={22} style={{ color: '#8b5cf6' }} />
                             </Box>
                             <Box>
-                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' } }}>Analysis</Typography>
-                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }, color: 'text.primary' }}>
-                                    Risk <span className={mode === 'dark' ? "text-gradient-vibrant" : ""}>Correlation Network</span>
+                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' }, display: 'block', lineHeight: 1.2 }}>Analysis</Typography>
+                                <Typography variant="h6" fontWeight="900" sx={{ mt: 0, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }, color: 'text.primary', lineHeight: 1.2 }}>
+                                    Risk <span className={theme.palette.mode === 'dark' ? "text-gradient-vibrant" : ""}>Correlation Network</span>
                                 </Typography>
                             </Box>
                         </Stack>
-                        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+                        <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%', position: 'relative' }}>
                             {user?.role !== 'viewer' && user?.role !== 'auditor' ? (
                                 <RiskNetworkGraph />
                             ) : (
@@ -282,99 +291,105 @@ const Dashboard = () => {
                     </Box>
                 </Grid>
 
-                <Grid item xs={12} md={12} lg={6}>
-                    <Box className="premium-glass glass-outline card-glow" sx={{
+                <Grid item xs={12} md={12} lg={6} sx={{ display: 'flex' }}>
+                    <Box className="premium-glass card-glow" sx={{
+                        width: '100%',
                         p: { xs: 2, sm: 3, md: 4 },
                         height: { xs: 'auto', md: '600px' },
                         minHeight: { xs: '400px', md: '600px' },
-                        position: 'relative',
-                        overflow: 'hidden',
-                        zIndex: 2, // Ensure it's above any bleed-out
-                        '&::before': mode === 'dark' ? {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.12) 50%, rgba(4, 120, 87, 0.08) 100%)',
-                            opacity: 0.6,
-                            zIndex: 0
-                        } : {},
-                        '& > *': {
-                            position: 'relative',
-                            zIndex: 1
-                        }
+                        display: 'flex',
+                        flexDirection: 'column'
                     }}>
-                        <Stack direction="row" alignItems="center" spacing={2} mb={{ xs: 2, md: 4 }}>
-                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#10b981', 0.1) }}>
+                        <Stack direction="row" alignItems="center" spacing={2} mb={{ xs: 2, md: 3 }}>
+                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#10b981', 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Shield size={22} style={{ color: '#10b981' }} />
                             </Box>
                             <Box>
-                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' } }}>Workflow</Typography>
-                                <Typography variant="h6" fontWeight="900" sx={{ mt: -0.5, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' } }}>Portfolio Lifecycle</Typography>
+                                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: 1, color: 'text.secondary', fontSize: { xs: '0.65rem', md: '0.75rem' }, display: 'block', lineHeight: 1.2 }}>Workflow</Typography>
+                                <Typography variant="h6" fontWeight="900" sx={{ mt: 0, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }, color: 'text.primary', lineHeight: 1.2 }}>Portfolio Lifecycle</Typography>
                             </Box>
                         </Stack>
 
-                        <Stack spacing={3}>
-                            {Object.entries(data.risks_by_status).map(([status, count]) => (
-                                <Box key={status}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
-                                        <Typography
-                                            variant="caption"
-                                            fontWeight={800}
-                                            sx={{ textTransform: 'uppercase', letterSpacing: 1, color: 'text.secondary' }}
-                                        >
-                                            {status}
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="900">
-                                            {count}
-                                        </Typography>
-                                    </Stack>
-                                    <LinearProgress
-                                        variant="determinate"
-                                        value={(count / data.total_risks) * 100}
+                        <Stack spacing={2} sx={{ flexGrow: 1 }}>
+                            {Object.entries(data.risks_by_status).map(([status, count]) => {
+                                const color = getStatusColor(status);
+                                const pct = data.total_risks > 0 ? Math.round((count / data.total_risks) * 100) : 0;
+                                return (
+                                    <Box
+                                        key={status}
                                         sx={{
-                                            height: 8,
-                                            borderRadius: 4,
-                                            bgcolor: alpha(getStatusColor(status), 0.1),
-                                            '& .MuiLinearProgress-bar': {
-                                                bgcolor: getStatusColor(status),
-                                                borderRadius: 4,
-                                                boxShadow: `0 0 15px ${alpha(getStatusColor(status), 0.4)}`,
-                                            },
+                                            p: 2,
+                                            borderRadius: 3,
+                                            background: alpha(color, mode === 'dark' ? 0.1 : 0.05),
+                                            border: `1px solid ${alpha(color, 0.2)}`,
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                                background: alpha(color, mode === 'dark' ? 0.18 : 0.1),
+                                                transform: 'translateX(4px)'
+                                            }
                                         }}
-                                    />
-                                </Box>
-                            ))}
+                                    >
+                                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.2}>
+                                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                                                <Box sx={{
+                                                    width: 32, height: 32,
+                                                    borderRadius: '50%',
+                                                    background: `linear-gradient(135deg, ${color}, ${alpha(color, 0.7)})`,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    color: '#fff', fontSize: '0.75rem', fontWeight: 900,
+                                                    boxShadow: `0 4px 10px ${alpha(color, 0.35)}`
+                                                }}>
+                                                    {getStatusIcon(status)}
+                                                </Box>
+                                                <Typography variant="caption" fontWeight={800}
+                                                    sx={{ textTransform: 'uppercase', letterSpacing: 1.5, color }}
+                                                >
+                                                    {status.replace(/_/g, ' ')}
+                                                </Typography>
+                                            </Stack>
+                                            <Stack direction="row" alignItems="baseline" spacing={0.5}>
+                                                <Typography variant="h6" fontWeight="900" sx={{ color }}>{count}</Typography>
+                                                <Typography variant="caption" color="text.secondary" fontWeight={700}>({pct}%)</Typography>
+                                            </Stack>
+                                        </Stack>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={pct}
+                                            sx={{
+                                                height: 6,
+                                                borderRadius: 4,
+                                                bgcolor: alpha(color, 0.1),
+                                                '& .MuiLinearProgress-bar': {
+                                                    background: `linear-gradient(90deg, ${color}, ${alpha(color, 0.6)})`,
+                                                    borderRadius: 4,
+                                                    boxShadow: `0 0 10px ${alpha(color, 0.5)}`,
+                                                },
+                                            }}
+                                        />
+                                    </Box>
+                                );
+                            })}
                         </Stack>
                     </Box>
                 </Grid>
 
+
                 {/* Row 4: Detailed Analytics & Strategic Insights */}
                 <Grid item xs={12} sm={12} md={12} lg={6}>
-                    <Box className="premium-glass glass-outline card-glow" sx={{
+                    <Box className="premium-glass card-glow" sx={{
                         p: { xs: 2, sm: 3, md: 4 },
                         height: { xs: 'auto', md: '450px' },
                         minHeight: { xs: '350px', md: '450px' },
                         position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.12) 50%, rgba(109, 40, 217, 0.08) 100%)',
-                            opacity: 0.6,
-                            zIndex: 0
-                        },
-                        '& > *': {
-                            position: 'relative',
-                            zIndex: 1
-                        }
+                        overflow: 'hidden'
                     }}>
+                        {/* Background Accent */}
+                        <Box sx={{
+                            position: 'absolute', top: 0, right: 0,
+                            width: 180, height: 180,
+                            background: `radial-gradient(circle, ${alpha('#ef4444', 0.08)}, transparent 70%)`,
+                            pointerEvents: 'none'
+                        }} />
                         <Stack direction="row" alignItems="center" spacing={2} mb={4}>
                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1) }}>
                                 <Zap size={22} style={{ color: '#8b5cf6' }} />
@@ -385,50 +400,60 @@ const Dashboard = () => {
                             </Box>
                         </Stack>
 
-                        <Stack spacing={5}>
-                            <Box>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                                    <Typography variant="body2" color="text.secondary" fontWeight={700}>
-                                        Average Inherent Risk
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight="900" color="error.main">
-                                        {data.average_inherent_risk_score}
-                                    </Typography>
+                        <Stack spacing={4}>
+                            {/* Inherent Risk */}
+                            <Box sx={{ p: 2.5, borderRadius: 3, background: alpha('#ef4444', 0.05), border: `1px solid ${alpha('#ef4444', 0.12)}` }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                    <Typography variant="body2" color="text.secondary" fontWeight={700}>Average Inherent Risk</Typography>
+                                    <Box sx={{
+                                        px: 2, py: 0.5, borderRadius: 10,
+                                        background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                                        boxShadow: '0 4px 12px rgba(239,68,68,0.35)'
+                                    }}>
+                                        <Typography variant="h5" fontWeight="900" sx={{ color: '#fff', lineHeight: 1 }}>
+                                            {data.average_inherent_risk_score}
+                                        </Typography>
+                                    </Box>
                                 </Stack>
                                 <LinearProgress
                                     variant="determinate"
                                     value={(parseFloat(data.average_inherent_risk_score) / (data.scales?.max_score || 25)) * 100}
                                     sx={{
-                                        height: 8,
-                                        borderRadius: 4,
+                                        height: 10, borderRadius: 4,
                                         bgcolor: alpha('#ef4444', 0.1),
                                         '& .MuiLinearProgress-bar': {
                                             background: 'linear-gradient(90deg, #ef4444, #b91c1c)',
                                             borderRadius: 4,
+                                            boxShadow: '0 0 12px rgba(239,68,68,0.4)'
                                         },
                                     }}
                                 />
                             </Box>
 
-                            <Box>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                                    <Typography variant="body2" color="text.secondary" fontWeight={700}>
-                                        Average Residual Risk
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight="900" color="success.main">
-                                        {data.average_residual_risk_score}
-                                    </Typography>
+                            {/* Residual Risk */}
+                            <Box sx={{ p: 2.5, borderRadius: 3, background: alpha('#10b981', 0.05), border: `1px solid ${alpha('#10b981', 0.12)}` }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                    <Typography variant="body2" color="text.secondary" fontWeight={700}>Average Residual Risk</Typography>
+                                    <Box sx={{
+                                        px: 2, py: 0.5, borderRadius: 10,
+                                        background: 'linear-gradient(135deg, #10b981, #047857)',
+                                        boxShadow: '0 4px 12px rgba(16,185,129,0.35)'
+                                    }}>
+                                        <Typography variant="h5" fontWeight="900" sx={{ color: '#fff', lineHeight: 1 }}>
+                                            {data.average_residual_risk_score}
+                                        </Typography>
+                                    </Box>
                                 </Stack>
                                 <LinearProgress
                                     variant="determinate"
                                     value={(parseFloat(data.average_residual_risk_score) / (data.scales?.max_score || 25)) * 100}
                                     sx={{
-                                        height: 8,
-                                        borderRadius: 4,
+                                        height: 10, borderRadius: 4,
                                         bgcolor: alpha('#10b981', 0.1),
                                         '& .MuiLinearProgress-bar': {
                                             background: 'linear-gradient(90deg, #10b981, #047857)',
                                             borderRadius: 4,
+                                            boxShadow: '0 0 12px rgba(16,185,129,0.4)'
                                         },
                                     }}
                                 />
@@ -437,30 +462,14 @@ const Dashboard = () => {
                     </Box>
                 </Grid>
 
+
                 <Grid item xs={12} sm={12} md={12} lg={6}>
-                    <Box className="premium-glass glass-outline card-glow" sx={{
+                    <Box className="premium-glass card-glow" sx={{
                         p: { xs: 2, sm: 3, md: 4 },
                         height: { xs: 'auto', md: '450px' },
                         minHeight: { xs: '350px', md: '450px' },
                         display: 'flex',
-                        flexDirection: 'column',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.10) 50%, rgba(59, 130, 246, 0.08) 100%)',
-                            opacity: 0.6,
-                            zIndex: 0
-                        },
-                        '& > *': {
-                            position: 'relative',
-                            zIndex: 1
-                        }
+                        flexDirection: 'column'
                     }}>
                         <Stack direction="row" alignItems="center" spacing={2} mb={4}>
                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#8b5cf6', 0.1) }}>
@@ -510,65 +519,57 @@ const Dashboard = () => {
 
                 <Grid item xs={12}>
                     <Box className="premium-glass card-glow" sx={{
-                        p: { xs: 2, sm: 3, md: 4 },
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.08) 25%, rgba(244, 63, 94, 0.06) 50%, rgba(245, 158, 11, 0.08) 75%, rgba(16, 185, 129, 0.06) 100%)',
-                            opacity: 0.5,
-                            zIndex: 0
-                        },
-                        '& > *': {
-                            position: 'relative',
-                            zIndex: 1
-                        }
+                        p: { xs: 2, sm: 3, md: 4 }
                     }}>
                         <Typography variant="h6" fontWeight="900" sx={{ mb: { xs: 2, md: 4 }, fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' } }}>Top Risk Verticals</Typography>
                         <Grid container spacing={3}>
-                            {data.top_risk_categories.map((category) => (
-                                <Grid item xs={12} sm={6} md={3} key={category.category}>
-                                    <Box
-                                        className="hover-lift"
-                                        sx={{
-                                            p: 3,
-                                            borderRadius: 4,
-                                            background: alpha(theme.palette.text.primary, 0.02),
-                                            border: `1px solid ${alpha(theme.palette.text.primary, 0.05)}`,
-                                            '&:hover': {
-                                                background: alpha(theme.palette.primary.main, 0.05),
-                                                borderColor: alpha(theme.palette.primary.main, 0.4),
-                                            }
-                                        }}
-                                    >
-                                        <Typography variant="caption" fontWeight="900" color="primary.main" sx={{ mb: 2.5, display: 'block', textTransform: 'uppercase', letterSpacing: 2 }}>
-                                            {category.category}
-                                        </Typography>
-                                        <Stack direction="row" spacing={3} alignItems="flex-end">
-                                            <Box>
-                                                <Typography variant="h3" fontWeight="900" sx={{ color: 'text.primary', lineHeight: 1 }}>
-                                                    {category.count}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary" fontWeight={700}>Volume</Typography>
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="h4" fontWeight="900" sx={{ color: 'error.light', lineHeight: 1 }}>
-                                                    {parseFloat(category.avg_score).toFixed(1)}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary" fontWeight={700}>Severity</Typography>
-                                            </Box>
-                                        </Stack>
-                                    </Box>
-                                </Grid>
-                            ))}
+                            {data.top_risk_categories.map((category, i) => {
+                                const accentColors = ['#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6'];
+                                const color = accentColors[i % accentColors.length];
+                                return (
+                                    <Grid item xs={12} sm={6} md={3} key={category.category}>
+                                        <Box
+                                            className="hover-lift"
+                                            sx={{
+                                                p: 3,
+                                                borderRadius: 4,
+                                                background: alpha(color, mode === 'dark' ? 0.08 : 0.04),
+                                                border: `1px solid ${alpha(color, 0.2)}`,
+                                                position: 'relative',
+                                                overflow: 'hidden',
+                                                '&:hover': {
+                                                    background: alpha(color, mode === 'dark' ? 0.14 : 0.08),
+                                                    borderColor: alpha(color, 0.5),
+                                                }
+                                            }}
+                                        >
+                                            {/* Colored top accent */}
+                                            <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, ${alpha(color, 0.4)})` }} />
+                                            <Typography variant="caption" fontWeight="900" sx={{ mb: 2.5, display: 'block', textTransform: 'uppercase', letterSpacing: 2, color }}>
+                                                {category.category}
+                                            </Typography>
+                                            <Stack direction="row" spacing={3} alignItems="flex-end">
+                                                <Box>
+                                                    <Typography variant="h3" fontWeight="900" sx={{ color: 'text.primary', lineHeight: 1 }}>
+                                                        {category.count}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary" fontWeight={700}>Volume</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="h4" fontWeight="900" sx={{ color, lineHeight: 1 }}>
+                                                        {parseFloat(category.avg_score).toFixed(1)}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary" fontWeight={700}>Avg Score</Typography>
+                                                </Box>
+                                            </Stack>
+                                        </Box>
+                                    </Grid>
+                                );
+                            })}
                         </Grid>
                     </Box>
                 </Grid>
+
             </Grid>
         </Box >
     );

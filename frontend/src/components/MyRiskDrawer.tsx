@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-    Drawer,
     Box,
     Typography,
     IconButton,
@@ -16,6 +15,8 @@ import {
     CircularProgress,
     Alert,
     Stack,
+    Dialog,
+    Grow
 } from '@mui/material';
 import { Close, Save, AttachFile } from '@mui/icons-material';
 import { myRisksAPI } from '../services/api';
@@ -120,15 +121,38 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
     };
 
     return (
-        <Drawer
-            anchor="right"
+        <Dialog
             open={open}
             onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            TransitionComponent={Grow}
             PaperProps={{
-                sx: { width: { xs: '100%', sm: 600 } }
+                sx: {
+                    borderRadius: 4,
+                    bgcolor: 'background.paper',
+                    backgroundImage: 'none',
+                    backdropFilter: 'blur(24px)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    maxHeight: '90vh',
+                    overflow: 'hidden'
+                }
             }}
         >
-            <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box
+                className="no-scrollbar"
+                sx={{
+                    p: 4,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflowY: 'auto',
+                    '&::-webkit-scrollbar': { display: 'none' },
+                    'scrollbarWidth': 'none',
+                    'msOverflowStyle': 'none'
+                }}
+            >
                 {/* Header */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h5" fontWeight={600}>
@@ -321,6 +345,6 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
                     </Box>
                 ) : null}
             </Box>
-        </Drawer>
+        </Dialog>
     );
 }

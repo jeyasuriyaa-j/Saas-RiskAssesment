@@ -95,7 +95,7 @@ export default function Layout() {
         const items = [
             { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard', roles: ['admin', 'risk_manager', 'auditor', 'viewer', 'user'] },
             { text: 'Risk Register', icon: <ClipboardList size={20} />, path: '/risks', roles: ['admin', 'risk_manager', 'auditor', 'viewer'] },
-            { text: 'My Risks', icon: <CheckSquare size={20} />, path: '/my-risks', roles: ['user', 'admin', 'risk_manager', 'auditor', 'viewer'] },
+            { text: 'My Risks', icon: <CheckSquare size={20} />, path: '/my-risks', roles: ['user'] },
             { text: 'Controls', icon: <Shield size={20} />, path: '/controls', roles: ['admin', 'risk_manager', 'auditor'] },
             { text: 'Incidents', icon: <AlertTriangle size={20} />, path: '/incidents', roles: ['admin', 'risk_manager', 'auditor', 'user', 'viewer'] },
             { text: 'Executive Board', icon: <BarChart3 size={20} />, path: '/governance/report', roles: ['admin', 'risk_manager', 'auditor', 'viewer'] },
@@ -123,19 +123,21 @@ export default function Layout() {
             position: 'relative',
             overflow: 'hidden'
         }}>
-            {/* Ambient Background Glow */}
-            <Box sx={{
-                position: 'absolute',
-                top: -100,
-                left: -100,
-                width: 300,
-                height: 300,
-                borderRadius: '50%',
-                background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.15)} 0%, transparent 70%)`,
-                filter: 'blur(40px)',
-                zIndex: 0,
-                pointerEvents: 'none'
-            }} />
+            {/* Ambient Background Glow - Hidden in Light Mode, Subtler in Dark */}
+            {mode === 'dark' && (
+                <Box sx={{
+                    position: 'absolute',
+                    top: -100,
+                    left: -100,
+                    width: 300,
+                    height: 300,
+                    borderRadius: '50%',
+                    background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.15)} 0%, transparent 70%)`,
+                    filter: 'blur(40px)',
+                    zIndex: 0,
+                    pointerEvents: 'none'
+                }} />
+            )}
 
             {/* Logo Section */}
             <Box sx={{
@@ -215,33 +217,31 @@ export default function Layout() {
                                     onClick={() => navigate(item.path)}
                                     selected={active}
                                     sx={{
-                                        borderRadius: 3,
-                                        py: 1.5,
+                                        borderRadius: 2.5,
+                                        py: 1.25,
                                         px: 2,
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        mb: 0.5,
+                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                         '&.Mui-selected': {
-                                            background: mode === 'dark'
-                                                ? `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.15)}, transparent)`
-                                                : `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.1)}, transparent)`,
-                                            borderLeft: `3px solid ${theme.palette.primary.main}`,
+                                            backgroundColor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.15 : 0.08),
+                                            color: theme.palette.primary.main,
                                             '&:hover': {
-                                                background: mode === 'dark'
-                                                    ? `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.25)}, transparent)`
-                                                    : `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.15)}, transparent)`,
-                                            }
+                                                backgroundColor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.2 : 0.12),
+                                            },
+                                            '& .MuiListItemIcon-root': {
+                                                color: theme.palette.primary.main,
+                                            },
                                         },
                                         '&:not(.Mui-selected):hover': {
-                                            bgcolor: alpha(theme.palette.text.primary, 0.04),
-                                            transform: 'translateX(4px)'
+                                            backgroundColor: theme.palette.action.hover,
+                                            transform: 'translateX(4px)',
                                         },
                                     }}
                                 >
                                     <ListItemIcon sx={{
-                                        minWidth: 42,
+                                        minWidth: 40,
                                         color: active ? 'primary.main' : 'text.secondary',
-                                        transition: 'color 0.3s'
+                                        transition: 'color 0.2s'
                                     }}>
                                         {item.icon}
                                     </ListItemIcon>
@@ -250,8 +250,8 @@ export default function Layout() {
                                         primaryTypographyProps={{
                                             variant: 'body2',
                                             fontWeight: active ? 700 : 500,
-                                            fontSize: '0.95rem',
-                                            color: 'text.primary'
+                                            fontSize: '0.9rem',
+                                            color: active ? 'primary.main' : 'text.primary'
                                         }}
                                     />
                                     {active && (
@@ -261,7 +261,7 @@ export default function Layout() {
                                                 height: 6,
                                                 borderRadius: '50%',
                                                 bgcolor: 'primary.main',
-                                                boxShadow: `0 0 10px ${theme.palette.primary.main}`
+                                                boxShadow: mode === 'dark' ? `0 0 10px ${theme.palette.primary.main}` : 'none'
                                             }} />
                                         </Fade>
                                     )}

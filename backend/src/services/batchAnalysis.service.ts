@@ -564,10 +564,10 @@ export interface BatchConfig {
 }
 
 const DEFAULT_BATCH_CONFIG: BatchConfig = {
-  batchSize: 25,      // 25 risks per AI call
-  workerCount: 4,     // 4 concurrent workers
+  batchSize: 5,       // REDUCED: Smaller batches for faster UI feedback
+  workerCount: 16,    // INCREASED: Higher concurrency for throughput
   maxRetries: 2,      // Max 2 retries per batch
-  retryDelay: 2000    // 2s between retries
+  retryDelay: 1500    // 1.5s between retries (slightly faster)
 };
 
 export interface RiskInput {
@@ -681,28 +681,21 @@ async function analyzeBatchWithAI(
 
   const inputIds = new Set(inputs.map(r => r.id));
 
-  const prompt = `You are a risk management expert. Analyze EXACTLY the ${inputs.length} risk(s) provided below.
+  const prompt = `Analyze ${inputs.length} risk(s). 
+Output: JSON array of EXACTLY ${inputs.length} objects. 
+Fields per object:
+- "i": input id
+- "t": professional title (MAX 6 words)
+- "d": description (MAX 1 sentence)
+- "dp": department
+- "l": likelihood 1-5
+- "im": impact 1-5
+- "r": remediation (MAX 10 words)
+- "fi": financial impact (range)
 
-CRITICAL RULES:
-- Return a JSON array containing EXACTLY ${inputs.length} object(s) — one per input risk.
-- DO NOT invent, add, or hallucinate extra risks that are not in the input.
-- Each output object MUST have "i" set to the same id value from the corresponding input.
-- The output array length MUST equal ${inputs.length}.
+Input: ${JSON.stringify(compactInput)}
 
-Input risks:
-${JSON.stringify(compactInput)}
-
-For EACH risk in the input, return an object with:
-- "i": EXACTLY the id value from the input (do not change it)
-- "t": a professional, brief risk title (MAX 10 words)
-- "d": a concise, improved description (MAX 2 sentences, root cause and impact only)
-- "dp": the most appropriate department
-- "l": likelihood score 1-5
-- "im": impact score 1-5
-- "r": a 1-sentence remediation recommendation
-- "fi": estimated financial impact (e.g. "$10K-$50K")
-
-Return ONLY the JSON array with ${inputs.length} item(s). No markdown, no explanation.`;
+Return ONLY JSON array. No text before/after.`;
 
   try {
     const response = await generateAIResponse(prompt, { timeout: 60000 });
@@ -813,7 +806,6 @@ export async function processBatchesHighPerf(
 
   try {
     // 1. Resume capability — check existing progress
-    // Refresh totalRows from DB (use total_batches which represents actual risk count)
     const jobInfo = await query('SELECT total_batches FROM import_jobs WHERE job_id = $1', [jobId]);
     if (jobInfo.rows.length > 0 && jobInfo.rows[0].total_batches > 0) {
       totalRows = jobInfo.rows[0].total_batches;
@@ -839,6 +831,47 @@ export async function processBatchesHighPerf(
       `UPDATE import_risk_analysis SET analysis_status = 'pending' WHERE job_id = $1 AND analysis_status = 'processing'`,
       [jobId]
     );
+
+    // ── ROW DEDUPLICATION ────────────────────────────────────────────────────────
+    // Group pending rows by content hash (title+description).
+    // Only ONE representative per group is sent to AI; duplicates get their result
+    // copied instantly — saving AI calls on repetitive datasets.
+    const allPendingRows = await query(
+      `SELECT analysis_id, row_index, row_hash
+       FROM import_risk_analysis
+       WHERE job_id = $1 AND analysis_status = 'pending'
+       ORDER BY row_index ASC`,
+      [jobId]
+    );
+
+    const hashGroups = new Map<string, number[]>();
+    for (const row of allPendingRows.rows) {
+      const h = row.row_hash as string;
+      if (!hashGroups.has(h)) hashGroups.set(h, []);
+      hashGroups.get(h)!.push(row.row_index as number);
+    }
+
+    // Track which rows are duplicates that should copy from their representative
+    const dedupCopyMap = new Map<number, number>(); // copyRow -> representativeRow
+    for (const [, indices] of hashGroups.entries()) {
+      if (indices.length < 2) continue;
+      const [representative, ...copies] = indices;
+      for (const copyIdx of copies) {
+        dedupCopyMap.set(copyIdx, representative);
+      }
+      logger.info(`⚡ Dedup: rows [${copies.join(',')}] are duplicates of row ${representative}`);
+    }
+
+    if (dedupCopyMap.size > 0) {
+      // Mark duplicate rows as 'processing' so the main worker loop skips them
+      await query(
+        `UPDATE import_risk_analysis SET analysis_status = 'processing'
+         WHERE job_id = $1 AND row_index = ANY($2)`,
+        [jobId, [...dedupCopyMap.keys()]]
+      );
+      logger.info(`⚡ Dedup: Skipping ${dedupCopyMap.size} duplicate rows — results will be copied after analysis`);
+    }
+    // ── END DEDUPLICATION ────────────────────────────────────────────────────────
 
     // 2. Parallel worker loop
     let hasMore = true;
@@ -951,38 +984,72 @@ export async function processBatchesHighPerf(
           }
         }
 
-        return { completed: batchCompleted, failed: batchFailed, results: success ? results! : [] };
+        // UPDATE COUNTS LOCALLY (in-memory)
+        completedCount += batchCompleted;
+        failedCount += batchFailed;
+
+        // INSTANT DEDUP PROPAGATION: Find all rows that depend on these results
+        // Group copy indices by their representative result for bulk updates
+        const resultToCopiesMap = new Map<string, number[]>();
+        if (success) {
+          for (const row of batch) {
+            const resultStr = resultMap.has(row.row_index) ? JSON.stringify(resultMap.get(row.row_index)) : null;
+            if (resultStr) {
+              const copies = [];
+              for (const [copyIdx, repIdx] of dedupCopyMap.entries()) {
+                if (repIdx === row.row_index) copies.push(copyIdx);
+              }
+              if (copies.length > 0) resultToCopiesMap.set(resultStr, copies);
+            }
+          }
+        }
+
+        // Perform bulk updates for duplicates (one query per unique result string in this batch)
+        let totalDuplicatesUpdated = 0;
+        for (const [resultStr, copyIndices] of resultToCopiesMap.entries()) {
+          try {
+            await query(
+              `UPDATE import_risk_analysis 
+               SET ai_result = $1, analysis_status = 'done', error_message = NULL, last_analysis_at = CURRENT_TIMESTAMP
+               WHERE job_id = $2 AND row_index = ANY($3::int[])`,
+              [resultStr, jobId, copyIndices]
+            );
+            totalDuplicatesUpdated += copyIndices.length;
+            completedCount += copyIndices.length;
+          } catch (dedupErr) {
+            logger.error(`Failed bulk dedup update for job ${jobId}:`, dedupErr);
+          }
+        }
+
+        if (totalDuplicatesUpdated > 0) {
+          logger.info(`⚡ Instant Dedup: Propagated results to ${totalDuplicatesUpdated} duplicates in bulk.`);
+        }
+
+        // DB UPDATE (Atomic Increment) & EMIT PROGRESS IMMEDIATELY
+        await query(
+          `UPDATE import_jobs 
+           SET completed_batches = completed_batches + $1, failed_batches = failed_batches + $2 
+           WHERE job_id = $3`,
+          [batchCompleted + totalDuplicatesUpdated, batchFailed, jobId]
+        );
+
+        const currentProgress = totalRows > 0 ? Math.round(((completedCount + failedCount) / totalRows) * 100) : 0;
+        batchAnalysisEvents.emit('progress', {
+          jobId,
+          progress: currentProgress,
+          completedCount,
+          failedCount,
+          totalCount: totalRows,
+          results: success ? results! : []
+        });
+
+        logger.info(`⚡ Batch Finish: ${completedCount + failedCount}/${totalRows} (${currentProgress}%) — Stream updated.`);
+
+        return { completed: batchCompleted + totalDuplicatesUpdated, failed: batchFailed, results: success ? results! : [] };
       });
 
-      // Wait for all workers to finish this round
-      const roundResults = await Promise.all(batchPromises);
-
-      // Aggregate counts
-      let roundResults_all: RiskAnalysisOutput[] = [];
-      for (const r of roundResults) {
-        completedCount += r.completed;
-        failedCount += r.failed;
-        roundResults_all.push(...r.results);
-      }
-
-      // Update job progress in DB
-      await query(
-        `UPDATE import_jobs SET completed_batches = $1, failed_batches = $2 WHERE job_id = $3`,
-        [completedCount, failedCount, jobId]
-      );
-
-      // Emit progress for real-time frontend updates
-      const progress = totalRows > 0 ? Math.round(((completedCount + failedCount) / totalRows) * 100) : 0;
-      batchAnalysisEvents.emit('progress', {
-        jobId,
-        progress,
-        completedCount,
-        failedCount,
-        totalCount: totalRows,
-        results: roundResults_all
-      });
-
-      logger.info(`⚡ Progress: ${completedCount + failedCount}/${totalRows} (${progress}%) — ${completedCount} done, ${failedCount} failed`);
+      // Wait for all workers to finish this round before pulling more rows
+      await Promise.all(batchPromises);
 
       // If we got fewer rows than requested, we're near the end
       if (allRows.length < claimSize) {
@@ -990,7 +1057,45 @@ export async function processBatchesHighPerf(
       }
     }
 
-    // 3. Completion
+    // 3. Propagate dedup results — copy representative's AI result to all duplicate rows
+    if (dedupCopyMap.size > 0) {
+      logger.info(`⚡ Dedup copy: propagating results to ${dedupCopyMap.size} duplicate rows`);
+      for (const [copyRowIndex, representativeRowIndex] of dedupCopyMap.entries()) {
+        try {
+          const repResult = await query(
+            `SELECT ai_result FROM import_risk_analysis WHERE job_id = $1 AND row_index = $2 AND analysis_status = 'done'`,
+            [jobId, representativeRowIndex]
+          );
+          if (repResult.rows.length > 0 && repResult.rows[0].ai_result) {
+            await query(
+              `UPDATE import_risk_analysis 
+               SET ai_result = $1, analysis_status = 'done', error_message = NULL, last_analysis_at = CURRENT_TIMESTAMP
+               WHERE job_id = $2 AND row_index = $3`,
+              [repResult.rows[0].ai_result, jobId, copyRowIndex]
+            );
+            completedCount++;
+          } else {
+            // Representative wasn't analysed successfully — mark the copy as failed
+            await query(
+              `UPDATE import_risk_analysis SET analysis_status = 'failed', error_message = 'Dedup source failed'
+               WHERE job_id = $1 AND row_index = $2`,
+              [jobId, copyRowIndex]
+            );
+            failedCount++;
+          }
+        } catch (copyErr: any) {
+          logger.error(`Dedup copy failed for row ${copyRowIndex}:`, copyErr);
+        }
+      }
+
+      // Update final progress counts
+      await query(
+        `UPDATE import_jobs SET completed_batches = $1, failed_batches = $2 WHERE job_id = $3`,
+        [completedCount, failedCount, jobId]
+      );
+    }
+
+    // 4. Completion
     const durationMs = Date.now() - startTime;
     const durationSec = (durationMs / 1000).toFixed(1);
 

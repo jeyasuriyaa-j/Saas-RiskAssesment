@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Box,
@@ -27,13 +27,15 @@ import {
     CardContent,
     Fade,
     Stack,
-    alpha
+    alpha,
+    useTheme
 } from '@mui/material';
 import { riskAPI, aiAPI, controlsAPI, remediationAPI, usersAPI } from '../services/api';
 import { Psychology, Refresh, AutoAwesome, Warning, Info, TrendingUp, CheckCircle, Save, ArrowBack, History as HistoryIcon, CompareArrows, Add, HealthAndSafety, Shield, Assessment, Bolt } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import AssignedTasksSection from '../components/AssignedTasksSection';
+import { PersonAdd } from '@mui/icons-material';
 
 interface RiskDetailProps {
     riskId?: string;
@@ -46,6 +48,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
     const isDrawer = !!propRiskId;
     const navigate = useNavigate();
     const { config, user } = useAuth();
+    const theme = useTheme();
     const aiFeatures = config?.ai_features || {};
 
     const [risk, setRisk] = useState<any>(null);
@@ -57,6 +60,8 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
     // AI state
     const [aiImproving, setAiImproving] = useState(false);
     const [aiScoring, setAiScoring] = useState(false);
+    const [aiRemediationLoading, setAiRemediationLoading] = useState(false);
+    const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
     const [aiSuggestion, setAiSuggestion] = useState<any>(null);
     const [scoreSuggestion, setScoreSuggestion] = useState<any>(null); // New state for score review
     const [deepAnalysis, setDeepAnalysis] = useState<any>(null);
@@ -69,7 +74,6 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
     const [mitigationStrength, setMitigationStrength] = useState('MODERATE');
 
     // AI Remediation
-    const [aiRemediationLoading, setAiRemediationLoading] = useState(false);
     const [remediationPlans, setRemediationPlans] = useState<any[]>([]);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
@@ -85,6 +89,46 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
         due_date: '',
         priority: 'MEDIUM'
     });
+
+    const handleRunAnalysis = useCallback(async (force: boolean = false) => {
+        if (!riskId || riskId === 'new') return;
+
+        setAnalyzing(true);
+        console.log(`Triggering AI Analysis for ${riskId} (Force: ${force})`);
+
+        try {
+            const response = await riskAPI.analyze(riskId, force);
+            setDeepAnalysis(response.data.analysis);
+            // Optionally update the risk object locally to include analysis
+            setRisk((prev: any) => prev ? { ...prev, analysis: response.data.analysis } : null);
+        } catch (err: any) {
+            console.error('AI Analysis Error:', err);
+            // Don't show a blocking error banner - the UI shows 'Analysis unavailable' info message instead
+        } finally {
+            setAnalyzing(false);
+        }
+    }, [riskId]);
+
+    const fetchRisk = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await riskAPI.get(riskId!);
+            const riskData = response.data;
+            setRisk(riskData);
+            setRemediationPlans(riskData.remediation_plans || []);
+            setDeepAnalysis(riskData.analysis);
+            setError('');
+
+            // Automatically trigger analysis if missing and not a 'new' risk
+            if (!riskData.analysis && riskId !== 'new') {
+                handleRunAnalysis(false);
+            }
+        } catch (err) {
+            setError('Failed to fetch risk details');
+        } finally {
+            setLoading(false);
+        }
+    }, [riskId, handleRunAnalysis]);
 
     useEffect(() => {
         if (riskId === 'new') {
@@ -104,47 +148,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
         } else if (riskId) {
             fetchRisk();
         }
-    }, [riskId]);
-
-    const fetchRisk = async () => {
-        setLoading(true);
-        try {
-            const response = await riskAPI.get(riskId!);
-            const riskData = response.data;
-            setRisk(riskData);
-            setRemediationPlans(riskData.remediation_plans || []);
-            setDeepAnalysis(riskData.analysis);
-            setError('');
-
-            // Automatically trigger analysis if missing and not a 'new' risk
-            if (!riskData.analysis && riskId !== 'new') {
-                handleRunAnalysis(false);
-            }
-        } catch (err) {
-            setError('Failed to fetch risk details');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleRunAnalysis = async (force: boolean = false) => {
-        if (!riskId || riskId === 'new') return;
-
-        setAnalyzing(true);
-        console.log(`Triggering AI Analysis for ${riskId} (Force: ${force})`);
-
-        try {
-            const response = await riskAPI.analyze(riskId, force);
-            setDeepAnalysis(response.data.analysis);
-            // Optionally update the risk object locally to include analysis
-            setRisk((prev: any) => prev ? { ...prev, analysis: response.data.analysis } : null);
-        } catch (err: any) {
-            console.error('AI Analysis Error:', err);
-            // Don't show a blocking error banner - the UI shows 'Analysis unavailable' info message instead
-        } finally {
-            setAnalyzing(false);
-        }
-    };
+    }, [riskId, fetchRisk]);
 
     const handleSave = async () => {
         try {
@@ -351,30 +355,28 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
         setAiRemediationLoading(true);
         try {
             const response = await remediationAPI.suggest(risk.risk_id);
-            // AI returns an array of suggestions. We can show them to user to accept.
-            // For simplicity in this sprint, we'll just alert or log them, 
-            // ideally we should have a dialog to preview and add them.
-            // Let's auto-add them as 'OPEN' plans for now or show in a temporary list.
-
-            // Assuming response.data is array of plans
-            const suggestions = response.data;
-            if (suggestions && suggestions.length > 0) {
-                // Create them in backend
-                for (const plan of suggestions) {
-                    await remediationAPI.create({
-                        risk_id: risk.risk_id,
-                        action_title: plan.action_title,
-                        description: plan.description,
-                        due_date: plan.suggested_due_date_days ? new Date(Date.now() + plan.suggested_due_date_days * 86400000) : null,
-                        ai_suggested: true
-                    });
-                }
-                fetchRisk();
-            }
+            setAiSuggestions(response.data || []);
         } catch (err) {
             setError('AI remediation suggestion failed');
         } finally {
             setAiRemediationLoading(false);
+        }
+    };
+
+    const handleAddSuggestion = async (plan: any) => {
+        try {
+            await remediationAPI.create({
+                risk_id: risk.risk_id,
+                action_title: plan.action_title,
+                description: plan.description,
+                due_date: plan.suggested_due_date_days ? new Date(Date.now() + plan.suggested_due_date_days * 86400000) : null,
+                ai_suggested: true
+            });
+            // Remove from suggestions list and refresh plans
+            setAiSuggestions(prev => prev.filter(p => p.action_title !== plan.action_title));
+            fetchRisk();
+        } catch (err) {
+            setError('Failed to add suggestion');
         }
     };
 
@@ -423,6 +425,17 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
         }
     };
 
+    const handleAssignSpecificPlan = (plan: any) => {
+        setAssignForm({
+            assignee_user_id: '',
+            action_title: plan.action_title,
+            description: plan.description,
+            due_date: plan.due_date ? format(new Date(plan.due_date), 'yyyy-MM-dd') : '',
+            priority: 'MEDIUM'
+        });
+        setOpenAssignDialog(true);
+    };
+
     const getStatusConfig = (status: string) => {
         const s = status?.toLowerCase();
         const configs: Record<string, { color: any; icon: any; label: string }> = {
@@ -441,9 +454,15 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
     if (!risk) return <Alert severity="error">Risk not found</Alert>;
 
     const statusConfig = getStatusConfig(risk.status);
+    const isDark = theme.palette.mode === 'dark';
 
     return (
-        <Box sx={{ p: isDrawer ? 3 : 0, color: isDrawer ? '#fff' : 'inherit' }}>
+        <Box sx={{
+            p: isDrawer ? 3 : 0,
+            color: (isDrawer && isDark) ? '#fff' : 'text.primary',
+            height: '100%',
+            overflowY: 'auto'
+        }}>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {isDrawer ? (
                     <Button startIcon={<ArrowBack />} onClick={onClose}>
@@ -477,9 +496,10 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
             </Box>
 
             <Typography variant="h4" fontWeight="800" gutterBottom sx={{
-                background: isDrawer ? 'linear-gradient(45deg, #fff 30%, #a5b4fc 90%)' : 'none',
-                WebkitBackgroundClip: isDrawer ? 'text' : 'none',
-                WebkitTextFillColor: isDrawer ? 'transparent' : 'inherit',
+                background: (isDrawer && isDark) ? 'linear-gradient(45deg, #fff 30%, #a5b4fc 90%)' : 'none',
+                WebkitBackgroundClip: (isDrawer && isDark) ? 'text' : 'none',
+                WebkitTextFillColor: (isDrawer && isDark) ? 'transparent' : 'inherit',
+                color: isDark ? 'inherit' : 'primary.main'
             }}>
                 {riskId === 'new' ? 'Add New Risk' : 'Risk Details'}
             </Typography>
@@ -500,10 +520,10 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                     <Grid item xs={12} md={8}>
                         <Paper sx={{
                             p: 3, mb: 3,
-                            bgcolor: isDrawer ? alpha('#fff', 0.03) : 'background.paper',
-                            border: isDrawer ? `1px solid ${alpha('#fff', 0.05)}` : 'none',
+                            bgcolor: (isDrawer && isDark) ? alpha('#fff', 0.03) : 'background.paper',
+                            border: (isDrawer && isDark) ? `1px solid ${alpha('#fff', 0.05)}` : `1px solid ${theme.palette.divider}`,
                             borderRadius: '16px',
-                            color: 'inherit'
+                            color: 'text.primary'
                         }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
                                 {riskId !== 'new' ? (
@@ -619,8 +639,8 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                         {/* AI STRATEGIC INSIGHTS SECTION */}
                         <Paper sx={{
                             p: 3, mb: 3,
-                            background: isDrawer ? alpha('#6366f1', 0.05) : 'background.paper',
-                            border: `1px solid ${alpha('#6366f1', 0.1)}`,
+                            background: (isDrawer && isDark) ? alpha('#6366f1', 0.05) : 'background.paper',
+                            border: `1px solid ${alpha('#6366f1', isDark ? 0.1 : 0.2)}`,
                             borderRadius: '24px',
                             position: 'relative',
                             overflow: 'hidden'
@@ -704,15 +724,15 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                                                         display: 'flex', gap: 1.5, alignItems: 'center'
                                                     }}>
                                                         <Typography variant="body2" sx={{ fontWeight: 600, color: '#22c55e' }}>{i + 1}</Typography>
-                                                        <Typography variant="body2" sx={{ color: isDrawer ? alpha('#fff', 0.8) : 'text.primary' }}>{s}</Typography>
+                                                        <Typography variant="body2" sx={{ color: (isDrawer && isDark) ? alpha('#fff', 0.8) : 'text.primary' }}>{s}</Typography>
                                                     </Box>
                                                 ))}
                                             </Stack>
                                         </Box>
 
                                         {deepAnalysis.whyMatters && (
-                                            <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha('#fff', 0.05)}` }}>
-                                                <Typography variant="caption" sx={{ fontStyle: 'italic', opacity: 0.5 }}>
+                                            <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+                                                <Typography variant="caption" sx={{ fontStyle: 'italic', color: 'text.secondary', opacity: 0.7 }}>
                                                     CRO Rationale: {deepAnalysis.whyMatters}
                                                 </Typography>
                                             </Box>
@@ -720,7 +740,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                                     </Box>
                                 </Fade>
                             ) : (
-                                <Alert severity="info" sx={{ borderRadius: '16px', bgcolor: alpha('#6366f1', 0.05), color: isDrawer ? alpha('#fff', 0.7) : 'inherit' }}>
+                                <Alert severity="info" sx={{ borderRadius: '16px', bgcolor: alpha('#6366f1', isDark ? 0.05 : 0.1), color: (isDrawer && isDark) ? alpha('#fff', 0.7) : 'text.secondary' }}>
                                     Analysis unavailable for this item. Click "Run Analysis" to generate insights.
                                 </Alert>
                             )}
@@ -878,20 +898,69 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
 
                     {/* Remediation Section */}
                     <Grid item xs={12}>
+                        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="h6" fontWeight="700">Remediation Suggestions</Typography>
+                            <Button
+                                startIcon={aiRemediationLoading ? <CircularProgress size={20} /> : <AutoAwesome />}
+                                onClick={handleSuggestRemediation}
+                                disabled={aiRemediationLoading}
+                                variant="contained"
+                                className="premium-button"
+                                sx={{ borderRadius: 2 }}
+                            >
+                                {aiRemediationLoading ? 'AI Generating...' : 'Suggest Remediation'}
+                            </Button>
+                        </Box>
+
+                        {aiSuggestions.length > 0 && (
+                            <Box sx={{ mb: 4 }}>
+                                <Alert severity="info" icon={<AutoAwesome />} sx={{ mb: 2, borderRadius: 2 }}>
+                                    AI has generated {aiSuggestions.length} potential remediation steps. Review and add them to your plan below.
+                                </Alert>
+                                <Grid container spacing={2}>
+                                    {aiSuggestions.map((suggestion, index) => (
+                                        <Grid item xs={12} key={index}>
+                                            <Card sx={{
+                                                bgcolor: alpha(theme.palette.secondary.main, 0.05),
+                                                border: `1px dashed ${theme.palette.secondary.main}`,
+                                                borderRadius: 3
+                                            }}>
+                                                <CardContent>
+                                                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>{suggestion.action_title}</Typography>
+                                                    <Typography variant="body2" color="text.secondary" paragraph>{suggestion.description}</Typography>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="text"
+                                                            startIcon={<Add />}
+                                                            onClick={() => handleAddSuggestion(suggestion)}
+                                                        >
+                                                            Add to Plans
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color="secondary"
+                                                            startIcon={<PersonAdd />}
+                                                            onClick={() => {
+                                                                handleAssignSpecificPlan(suggestion);
+                                                                setAiSuggestions(prev => prev.filter((_, i) => i !== index));
+                                                            }}
+                                                            sx={{ borderRadius: 2 }}
+                                                        >
+                                                            Assign Now
+                                                        </Button>
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                                <Divider sx={{ my: 4 }} />
+                            </Box>
+                        )}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                             <Typography variant="h6">Remediation Plans</Typography>
-                            {aiFeatures.risk_suggestion !== false && (
-                                <Button
-                                    variant="contained"
-                                    color="secondary"
-                                    startIcon={<AutoAwesome />}
-                                    onClick={handleSuggestRemediation}
-                                    disabled={aiRemediationLoading}
-                                    sx={{ mr: 1 }}
-                                >
-                                    {aiRemediationLoading ? 'AI Analyzing...' : 'Suggest Remediation'}
-                                </Button>
-                            )}
                             <Button
                                 variant="contained"
                                 color="primary"
@@ -936,11 +1005,22 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                                             <Typography variant="body2" color="text.secondary" paragraph>
                                                 {plan.description}
                                             </Typography>
-                                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
-                                                {plan.ai_suggested && <Chip icon={<AutoAwesome />} label="AI Suggested" size="small" color="secondary" variant="outlined" />}
-                                                <Typography variant="caption">
-                                                    Due: {plan.due_date ? format(new Date(plan.due_date), 'PP') : 'No date'}
-                                                </Typography>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                                    {plan.ai_suggested && <Chip icon={<AutoAwesome />} label="AI Suggested" size="small" color="secondary" variant="outlined" />}
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        Due: {plan.due_date ? format(new Date(plan.due_date), 'PP') : 'No date'}
+                                                    </Typography>
+                                                </Box>
+                                                <Button
+                                                    size="small"
+                                                    startIcon={<PersonAdd />}
+                                                    onClick={() => handleAssignSpecificPlan(plan)}
+                                                    variant="outlined"
+                                                    sx={{ borderRadius: 2 }}
+                                                >
+                                                    Assign
+                                                </Button>
                                             </Box>
                                         </CardContent>
                                     </Card>
@@ -1120,7 +1200,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                             size="small"
                             color="primary"
                             variant="outlined"
-                            sx={{ ml: 2 }}
+                            sx={{ ml: 2, fontWeight: 'bold' }}
                         />
                     )}
                 </DialogTitle>

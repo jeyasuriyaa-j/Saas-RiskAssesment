@@ -131,7 +131,7 @@ router.post('/upload', authorize('admin', 'risk_manager', 'user'), upload.single
 
         const job = jobResult.rows[0];
 
-        const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        // Removed sleep — validation and duplicate detection now run in parallel
 
         // Trigger AI analysis asynchronously
         (async () => {
@@ -255,168 +255,131 @@ router.post('/upload', authorize('admin', 'risk_manager', 'user'), upload.single
                 );
                 logger.info(`Job ${job.job_id}: Transitioned to 'mapping' status.`);
 
+                // Step 4: Run validation AND duplicate detection in PARALLEL (no more serial waits)
                 let validationReport = null;
-                try {
-                    validationReport = await validateDataQuality(rawRows, tenantId);
-                } catch (e) {
-                    logger.error(`AI data validation failed for job ${job.job_id}:`, e);
-                }
-
-                // Space out request for duplicate detection
-                await sleep(3000);
-
-                // Step 4: Duplicate Detection (Sprint 3)
                 let duplicateReportData = null;
-                try {
-                    // Get existing risks for this tenant - removed LIMIT to ensure full duplicate check
-                    const existingRisksResult = await query(
-                        `SELECT risk_id, risk_code, statement, description, category, 
+
+                const [validationResult, duplicateResult] = await Promise.allSettled([
+                    validateDataQuality(rawRows, tenantId),
+                    (async () => {
+                        // Get existing risks for this tenant
+                        const existingRisksResult = await query(
+                            `SELECT risk_id, risk_code, statement, description, category, 
                                  likelihood_score, impact_score, status
                           FROM risks 
                           WHERE tenant_id = $1`,
-                        [tenantId]
-                    );
+                            [tenantId]
+                        );
 
-                    // Parse incoming risks from Excel
-                    const incomingHeaderRowIndex = structure.header_row_index ?? 0;
-                    const dataRows = rawRows.slice(incomingHeaderRowIndex + 1);
-                    const riskHeaders = rawRows[incomingHeaderRowIndex] as string[];
+                        // Parse incoming risks from Excel
+                        const incomingHeaderRowIndex = structure.header_row_index ?? 0;
+                        const dataRowsForDup = rawRows.slice(incomingHeaderRowIndex + 1);
+                        const riskHeaders = rawRows[incomingHeaderRowIndex] as string[];
 
-                    // Helper to safely find header index
-                    const findHeaderIndex = (keywords: string[]): number => {
-                        return riskHeaders.findIndex((h: any) => {
-                            if (!h || typeof h !== 'string') return false;
-                            const lower = h.toLowerCase();
-                            return keywords.some(kw => lower.includes(kw));
-                        });
-                    };
+                        const findHeaderIndex = (keywords: string[]): number => {
+                            return riskHeaders.findIndex((h: any) => {
+                                if (!h || typeof h !== 'string') return false;
+                                const lower = h.toLowerCase();
+                                return keywords.some(kw => lower.includes(kw));
+                            });
+                        };
 
-                    const incomingRisks = dataRows.slice(0, 100).map((row: any, index: number) => ({
-                        risk_id: `TEMP-${index}`,
-                        statement: row[findHeaderIndex(['risk', 'statement', 'title'])] || '',
-                        description: row[findHeaderIndex(['description'])] || '',
-                        category: row[findHeaderIndex(['category'])] || '',
-                        risk_code: row[findHeaderIndex(['code'])] || ''
-                    })).filter(r => r.statement);
+                        const incomingRisks = dataRowsForDup.slice(0, 100).map((row: any, index: number) => ({
+                            risk_id: `TEMP-${index}`,
+                            statement: row[findHeaderIndex(['risk', 'statement', 'title'])] || '',
+                            description: row[findHeaderIndex(['description'])] || '',
+                            category: row[findHeaderIndex(['category'])] || '',
+                            risk_code: row[findHeaderIndex(['code'])] || ''
+                        })).filter((r: any) => r.statement);
 
-                    // Combine existing + incoming for duplicate detection
-                    const allRisks = [...existingRisksResult.rows, ...incomingRisks];
+                        const allRisksForDup = [...existingRisksResult.rows, ...incomingRisks];
 
-                    if (allRisks.length > 1) {
                         let relevantClusters: any[] = [];
                         let mergeStrategies: any[] = [];
 
-                        try {
-                            const duplicateAnalysis = await detectRiskDuplicates(allRisks, tenantId);
-
-                            // Filter clusters to only show those involving incoming risks
-                            relevantClusters = duplicateAnalysis.duplicate_clusters.filter((cluster: any) =>
-                                (cluster.risk_ids || cluster.risks_involved || []).some((id: string) => id.startsWith('TEMP-'))
-                            );
-
-                            // Generate AI merge strategies for each cluster
-                            if (relevantClusters.length > 0) {
-                                const { generateMergeStrategies } = await import('../services/ai.service');
-                                mergeStrategies = await generateMergeStrategies(
-                                    relevantClusters,
-                                    existingRisksResult.rows,
-                                    incomingRisks
+                        if (allRisksForDup.length > 1) {
+                            try {
+                                const duplicateAnalysis = await detectRiskDuplicates(allRisksForDup, tenantId);
+                                relevantClusters = duplicateAnalysis.duplicate_clusters.filter((cluster: any) =>
+                                    (cluster.risk_ids || cluster.risks_involved || []).some((id: string) => id.startsWith('TEMP-'))
                                 );
+
+                                if (relevantClusters.length > 0) {
+                                    const { generateMergeStrategies } = await import('../services/ai.service');
+                                    mergeStrategies = await generateMergeStrategies(
+                                        relevantClusters,
+                                        existingRisksResult.rows,
+                                        incomingRisks
+                                    );
+                                }
+                            } catch (aiDupError) {
+                                logger.error(`AI duplicate detection failed for job ${job.job_id} (using fallback):`, aiDupError);
                             }
-                        } catch (aiDupError) {
-                            logger.error(`AI duplicate detection failed for job ${job.job_id} (using fallback):`, aiDupError);
-                        }
 
-                        // Robust Fallback: Exact risk_code match AND Title match detection (ALWAYS RUNS)
-                        const risksWithCodes = incomingRisks.filter((r: any) => r.risk_code);
-                        logger.info(`[DEBUG] Fallback Check - Incoming risks with codes: ${risksWithCodes.length}. Total incoming: ${incomingRisks.length}. Total existing: ${existingRisksResult.rows.length}`);
+                            // Fallback: Exact code + title match
+                            const risksWithCodes = incomingRisks.filter((r: any) => r.risk_code);
+                            logger.info(`[DEBUG] Fallback Check - Incoming risks with codes: ${risksWithCodes.length}. Total incoming: ${incomingRisks.length}. Total existing: ${existingRisksResult.rows.length}`);
 
-                        // 1. Check Risk Codes
-                        for (const incoming of risksWithCodes) {
-                            const incomingCode = (incoming.risk_code || '').toString().trim();
-                            const existing = existingRisksResult.rows.find((r: any) =>
-                                (r.risk_code || '').toString().trim() === incomingCode
-                            );
-
-                            if (existing) {
-                                logger.info(`[DEBUG] CODE MATCH: ${incomingCode} matches UUID ${existing.risk_id}`);
-                                const tempId = incoming.risk_id;
-                                const alreadyClustered = relevantClusters.some((c: any) =>
-                                    (c.risk_ids || c.risks_involved || []).includes(tempId)
+                            for (const incoming of risksWithCodes) {
+                                const incomingCode = (incoming.risk_code || '').toString().trim();
+                                const existing = existingRisksResult.rows.find((r: any) =>
+                                    (r.risk_code || '').toString().trim() === incomingCode
                                 );
-
-                                if (!alreadyClustered) {
-                                    const fallbackClusterId = `CODE-DUPE-${incomingCode}`;
-                                    relevantClusters.push({
-                                        cluster_id: fallbackClusterId,
-                                        risk_ids: [tempId, existing.risk_id],
-                                        reason: `Matching Risk Code: ${incomingCode}`,
-                                        confidence: 1.0,
-                                        cluster_type: 'exact_code_match'
-                                    });
-                                    mergeStrategies.push({
-                                        cluster_id: fallbackClusterId,
-                                        recommended_strategy: 'replace_existing',
-                                        justification: 'Exact risk code match found in database.'
-                                    });
+                                if (existing) {
+                                    const tempId = incoming.risk_id;
+                                    const alreadyClustered = relevantClusters.some((c: any) =>
+                                        (c.risk_ids || c.risks_involved || []).includes(tempId)
+                                    );
+                                    if (!alreadyClustered) {
+                                        const fallbackClusterId = `CODE-DUPE-${incomingCode}`;
+                                        relevantClusters.push({ cluster_id: fallbackClusterId, risk_ids: [tempId, existing.risk_id], reason: `Matching Risk Code: ${incomingCode}`, confidence: 1.0, cluster_type: 'exact_code_match' });
+                                        mergeStrategies.push({ cluster_id: fallbackClusterId, recommended_strategy: 'replace_existing', justification: 'Exact risk code match found in database.' });
+                                    }
                                 }
                             }
-                        }
 
-                        // 2. Check Risk Titles/Statements (Normalized)
-                        for (const incoming of incomingRisks) {
-                            if (!incoming.statement) continue;
-
-                            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-                            const incomingTitleNorm = normalize(incoming.statement);
-
-                            const existing = existingRisksResult.rows.find((r: any) =>
-                                normalize(r.statement || r.title || '') === incomingTitleNorm ||
-                                normalize(r.description || '') === incomingTitleNorm // sometimes title is in desc
-                            );
-
-                            if (existing) {
-                                const tempId = incoming.risk_id;
-                                // Check if this incoming risk is already clustered (e.g. by code)
-                                const alreadyClustered = relevantClusters.some((c: any) =>
-                                    (c.risk_ids || c.risks_involved || []).includes(tempId)
+                            for (const incoming of incomingRisks) {
+                                if (!incoming.statement) continue;
+                                const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                const incomingTitleNorm = normalize(incoming.statement);
+                                const existing = existingRisksResult.rows.find((r: any) =>
+                                    normalize(r.statement || r.title || '') === incomingTitleNorm ||
+                                    normalize(r.description || '') === incomingTitleNorm
                                 );
-
-                                if (!alreadyClustered) {
-                                    logger.info(`[DEBUG] TITLE MATCH: "${incoming.statement}" matches existing risk ${existing.risk_id}`);
-                                    const fallbackClusterId = `TITLE-DUPE-${tempId}`;
-                                    relevantClusters.push({
-                                        cluster_id: fallbackClusterId,
-                                        risk_ids: [tempId, existing.risk_id],
-                                        reason: `Matching Risk Title: "${existing.statement}"`,
-                                        confidence: 1.0,
-                                        cluster_type: 'exact_title_match'
-                                    });
-                                    mergeStrategies.push({
-                                        cluster_id: fallbackClusterId,
-                                        recommended_strategy: 'skip_import', // Default safe action for title match
-                                        justification: 'Exact risk title match found in database.'
-                                    });
+                                if (existing) {
+                                    const tempId = incoming.risk_id;
+                                    const alreadyClustered = relevantClusters.some((c: any) =>
+                                        (c.risk_ids || c.risks_involved || []).includes(tempId)
+                                    );
+                                    if (!alreadyClustered) {
+                                        logger.info(`[DEBUG] TITLE MATCH: "${incoming.statement}" matches existing risk ${existing.risk_id}`);
+                                        const fallbackClusterId = `TITLE-DUPE-${tempId}`;
+                                        relevantClusters.push({ cluster_id: fallbackClusterId, risk_ids: [tempId, existing.risk_id], reason: `Matching Risk Title: "${existing.statement}"`, confidence: 1.0, cluster_type: 'exact_title_match' });
+                                        mergeStrategies.push({ cluster_id: fallbackClusterId, recommended_strategy: 'skip_import', justification: 'Exact risk title match found in database.' });
+                                    }
                                 }
                             }
+
+                            logger.info(`Duplicate detection completed for job ${job.job_id}: ${relevantClusters.length} potential duplicates found`);
                         }
 
-                        duplicateReportData = {
-                            clusters: relevantClusters,
-                            total_duplicates: relevantClusters.length,
-                            merge_strategies: mergeStrategies
-                        };
+                        return { clusters: relevantClusters, total_duplicates: relevantClusters.length, merge_strategies: mergeStrategies };
+                    })()
+                ]);
 
-                        logger.info(`Duplicate detection completed for job ${job.job_id}: ${relevantClusters.length} potential duplicates found`);
-                    }
-                } catch (dupError) {
-                    logger.error(`Duplicate detection failed for job ${job.job_id}:`, dupError);
-                    // Don't fail the entire import if duplicate detection fails
+                if (validationResult.status === 'fulfilled') {
+                    validationReport = validationResult.value;
+                } else {
+                    logger.error(`AI data validation failed for job ${job.job_id}:`, (validationResult as PromiseRejectedResult).reason);
+                }
+
+                if (duplicateResult.status === 'fulfilled') {
+                    duplicateReportData = duplicateResult.value;
+                } else {
+                    logger.error(`Duplicate detection failed for job ${job.job_id}:`, (duplicateResult as PromiseRejectedResult).reason);
                 }
 
                 // Final Update: Set status to 'mapping' only after all analysis is done
-                // IMPORTANT: Only set to 'mapping' if current status is still 'processing'
-                // to avoid overwriting a status that has already advanced (e.g. to 'analyzing')
                 await query(
                     `UPDATE import_jobs 
                      SET status = CASE WHEN status = 'processing' THEN 'mapping' ELSE status END,
@@ -428,7 +391,8 @@ router.post('/upload', authorize('admin', 'risk_manager', 'user'), upload.single
                         aiResponse?.confidence_score || 0,
                         JSON.stringify(validationReport || {}),
                         JSON.stringify(duplicateReportData || {}),
-                        job.job_id]
+                        job.job_id
+                    ]
                 );
 
             } catch (error: any) {
@@ -779,7 +743,7 @@ router.post('/jobs/:jobId/analyze-risks', authorize('admin', 'risk_manager', 'us
             const inputs = allMapped.filter(r => r.title && r.title.trim().length > 0);
             logger.info(`Job ${jobId}: ${dataRows.length} raw rows → ${inputs.length} non-empty rows to analyze.`);
 
-            // Bulk insert
+            // Bulk insert for high performance analysis
             await bulkInsertRisksHighPerf(jobId, tenantId, inputs);
         } else {
             logger.error(`File not found for job ${jobId}: ${job.file_path}`);
@@ -790,16 +754,22 @@ router.post('/jobs/:jobId/analyze-risks', authorize('admin', 'risk_manager', 'us
     }
     // -----------------------------------------------------
 
-    // Trigger HIGH-SPEED parallel AI analysis in background
-    processBatchesHighPerf(jobId, tenantId, job.total_rows || 0, {
-        batchSize: batchSize || 25,    // 25 risks per AI call
-        workerCount: workerCount || 4  // 4 concurrent workers
+    // Trigger HIGH-SPEED parallel AI batch analysis in background
+    // Use adaptive batch sizes based on total row count
+    const totalRiskCount = job.total_rows || 0;
+    const adaptiveBatchSize = batchSize || (totalRiskCount <= 50 ? 5 : totalRiskCount <= 200 ? 10 : 15);
+    const adaptiveWorkerCount = workerCount || (totalRiskCount <= 50 ? 4 : totalRiskCount <= 200 ? 8 : 10);
+    logger.info(`Job ${jobId}: Starting analysis with batchSize=${adaptiveBatchSize}, workers=${adaptiveWorkerCount} for ${totalRiskCount} rows`);
+
+    processBatchesHighPerf(jobId, tenantId, totalRiskCount, {
+        batchSize: adaptiveBatchSize,
+        workerCount: adaptiveWorkerCount
     }).catch((error: any) => {
         logger.error(`High-speed AI analysis failed for job ${jobId}:`, error);
     });
 
     res.json({
-        message: 'High-performance AI analysis started',
+        message: 'High-speed batched AI analysis started',
         job_id: jobId,
         status: 'analyzing',
         config: {
@@ -1325,11 +1295,16 @@ async function executeImportWithDecisions(
             }
         });
 
-        // Process each row
-        for (let i = 0; i < data.length; i++) {
-            try {
-                const row = data[i];
-                const rowIndex = i + 1; // Excel row numbers are 1-indexed
+        // Process in batches for performance
+        const BATCH_SIZE = 50;
+        let batchPromises = [];
+
+        for (let i = 0; i < data.length; i += BATCH_SIZE) {
+            const batch = data.slice(i, i + BATCH_SIZE);
+            const batchStartIndex = i;
+
+            const processRow = async (rowIndexOffset: number, row: any) => {
+                const rowIndex = batchStartIndex + rowIndexOffset + 1; // Excel row numbers are 1-indexed
                 const riskData: any = {};
 
                 // Map columns to fields using column names
@@ -1364,7 +1339,7 @@ async function executeImportWithDecisions(
                 if (!riskKey) {
                     failedRows++;
                     errors.push({ row_number: rowIndex, error: 'Missing title/statement', row_data: row });
-                    continue;
+                    return;
                 }
 
                 if (excelRiskTracker.has(riskKey)) {
@@ -1375,7 +1350,7 @@ async function executeImportWithDecisions(
 
                 // Check AI analysis decision for this row
                 const rowDecisions = (finalDecisions as any).row_decisions as Record<string, string> || {};
-                let rowDecision = rowDecisions[`row_${i}`] || (title ? rowDecisions[title] : undefined);
+                let rowDecision = rowDecisions[`row_${rowIndex - 1}`] || (title ? rowDecisions[title] : undefined);
 
                 // Fallback to global AI acceptance if not specified
                 if (!rowDecision && finalDecisions.accept_all_ai) {
@@ -1384,8 +1359,8 @@ async function executeImportWithDecisions(
 
                 rowDecision = rowDecision || 'original';
                 const aiAnalysis = Array.isArray(aiAnalysisResults)
-                    ? aiAnalysisResults.find((r: any) => r.row_index === i)
-                    : (aiAnalysisResults as any)[`row_${i}`] || (title ? (aiAnalysisResults as any)[title] : undefined);
+                    ? aiAnalysisResults.find((r: any) => r.row_index === (rowIndex - 1))
+                    : (aiAnalysisResults as any)[`row_${rowIndex - 1}`] || (title ? (aiAnalysisResults as any)[title] : undefined);
 
                 let finalStatement = title;
                 let finalDescription = riskData.description;
@@ -1407,7 +1382,7 @@ async function executeImportWithDecisions(
                 if (rowDecision === 'skip') {
                     skippedRisks++;
                     logger.info(`Skipping row ${rowIndex} per user decision: ${title}`);
-                    continue;
+                    return;
                 }
 
                 // Generate risk code
@@ -1449,7 +1424,7 @@ async function executeImportWithDecisions(
 
                         if (mergeDecision === 'skip') {
                             skippedRisks++;
-                            continue;
+                            return;
                         }
 
                         // Default behavior: update (override) the existing risk
@@ -1498,7 +1473,7 @@ async function executeImportWithDecisions(
                             importedRiskIds.push(existingId);
                             updatedRisks++;
                             processedRows++;
-                            continue;
+                            return;
                         }
                     }
                 }
@@ -1558,14 +1533,20 @@ async function executeImportWithDecisions(
 
                 newRisks++;
                 processedRows++;
-            } catch (error: any) {
-                failedRows++;
-                errors.push({
-                    row_number: i + 2,
-                    error: error.message,
-                    row_data: data[i]
-                });
-            }
+            };
+
+            batchPromises = batch.map((row, indexOffset) =>
+                processRow(indexOffset, row).catch(error => {
+                    failedRows++;
+                    errors.push({
+                        row_number: batchStartIndex + indexOffset + 2,
+                        error: error.message,
+                        row_data: row
+                    });
+                })
+            );
+
+            await Promise.all(batchPromises);
         }
 
         // Update job as completed

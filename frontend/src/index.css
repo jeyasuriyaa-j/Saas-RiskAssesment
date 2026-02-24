@@ -60,31 +60,31 @@
 
 [data-theme='light'] {
   /* Backgrounds */
-  --bg-primary: #f8fafc;
+  --bg-primary: #f1f5f9;
   --bg-secondary: #ffffff;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-glass: rgba(255, 255, 255, 0.9);
 
   /* Text */
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-muted: #64748b;
 
   /* Borders */
   --border-subtle: rgba(15, 23, 42, 0.05);
   --border-strong: rgba(15, 23, 42, 0.1);
-  --border-soft: rgba(15, 23, 42, 0.08);
-  --border-medium: rgba(139, 92, 246, 0.2);
+  --border-soft: rgba(15, 23, 42, 0.06);
+  --border-medium: rgba(124, 58, 237, 0.15);
 
   /* Shadows */
-  --shadow-soft: 0 4px 6px -1px rgba(15, 23, 42, 0.05);
+  --shadow-soft: 0 4px 6px -1px rgba(15, 23, 42, 0.03);
 
   /* Gradients */
-  --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
+  --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
 
   /* Inputs */
-  --bg-input: rgba(15, 23, 42, 0.03);
+  --bg-input: rgba(15, 23, 42, 0.02);
 
   color-scheme: light;
 }
@@ -114,12 +114,40 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.2);
+  background: rgba(124, 58, 237, 0.2);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.4);
+  background: rgba(124, 58, 237, 0.4);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  overflow: -moz-scrollbars-none;
+}
+
+/* Aggressive hide for Dialog containers and ALL internal elements */
+[class*="MuiDialog-paper"],
+[class*="MuiDialog-paper"] *,
+.no-scrollbar,
+.no-scrollbar * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[class*="MuiDialog-paper"]::-webkit-scrollbar,
+[class*="MuiDialog-paper"] *::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar,
+.no-scrollbar *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -127,12 +155,12 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.1);
+  background: rgba(124, 58, 237, 0.1);
   border-radius: 10px;
 }
 
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.3);
+  background: rgba(124, 58, 237, 0.3);
 }
 
 /* Typography Enhancements */
@@ -143,13 +171,13 @@ h4,
 h5,
 h6 {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 /* Utilities */
 .gradient-text {
-  background: linear-gradient(90deg, #a78bfa, #c084fc, #60a5fa);
+  background: linear-gradient(90deg, #7c3aed, #a78bfa, #3b82f6);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -162,12 +190,12 @@ h6 {
   border-radius: var(--radius-lg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
   border-color: var(--border-medium);
-  box-shadow: var(--glow-primary);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
 }
 
 /* Buttons */
@@ -176,17 +204,17 @@ h6 {
   color: #ffffff;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 8px 16px;
-  font-weight: 500;
+  padding: 10px 20px;
+  font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(90deg, #5b21b6, #7c3aed);
-  transform: translateY(-2px);
-  box-shadow: var(--glow-primary);
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
 }
 
 .btn-secondary {
@@ -194,15 +222,15 @@ h6 {
   color: var(--text-primary);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  padding: 8px 16px;
-  font-weight: 500;
+  padding: 10px 20px;
+  font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
 .btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(15, 23, 42, 0.04);
   border-color: var(--border-medium);
 }
 
@@ -214,7 +242,7 @@ textarea {
   border: 1px solid var(--border-soft);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  padding: 10px;
+  padding: 12px;
   outline: none;
   transition: all 0.2s;
 }
@@ -223,12 +251,15 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--primary);
-  background: var(--bg-input);
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
+  background: var(--bg-secondary);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
 }
 
-/* MUI Overrides — removed hardcoded backgrounds; theme.ts handles these */
-
+/* Global Focus Ring */
+*:focus-visible {
+  outline: 2px solid #7c3aed !important;
+  outline-offset: 2px !important;
+}
 
 /* Subtle Breathing Glow for Background */
 .glow-mesh {
@@ -240,16 +271,16 @@ textarea:focus {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.05) 0%, transparent 50%),
     radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
     radial-gradient(circle at 50% 50%, rgba(2, 6, 23, 1) 0%, rgba(2, 6, 23, 0.8) 100%);
 }
 
 [data-theme='light'] .glow-mesh {
   background:
-    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(248, 250, 252, 1) 0%, rgba(248, 250, 252, 0.9) 100%);
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, #f1f5f9 0%, #f1f5f9 100%);
 }
 
 @keyframes mesh-float {

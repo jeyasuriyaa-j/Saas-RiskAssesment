@@ -25,27 +25,12 @@ import {
     DarkMode,
     LightMode,
 } from '@mui/icons-material';
-import { MenuItem } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
-
 import { useThemeMode } from '../contexts/ThemeModeContext';
 import InteractiveBackground from '../components/InteractiveBackground';
 
-// Predefined departments/organizations
-const DEPARTMENTS = [
-    'IT',
-    'Finance',
-    'Operations',
-    'Sales & Marketing',
-    'Human Resources',
-    'Legal & Compliance',
-    'Warehouse',
-    'Customer Support',
-    'Research & Development',
-    'Executive'
-];
-
 export default function Register() {
+    const { mode, toggleMode } = useThemeMode();
     const navigate = useNavigate();
     const { register } = useAuth();
     const [formData, setFormData] = useState({
@@ -94,8 +79,6 @@ export default function Register() {
             setLoading(false);
         }
     };
-
-    const { mode, toggleMode } = useThemeMode();
 
     return (
         <InteractiveBackground>
@@ -196,10 +179,10 @@ export default function Register() {
                                         Organization Name
                                     </Typography>
                                     <TextField
-                                        select
                                         required
                                         fullWidth
                                         name="org_name"
+                                        placeholder="Enter your organization name"
                                         value={formData.org_name}
                                         onChange={handleChange}
                                         InputProps={{
@@ -236,19 +219,9 @@ export default function Register() {
                                                         WebkitTextFillColor: '#ffffff !important',
                                                     }
                                                 }
-                                            },
-                                            '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.7)' }
+                                            }
                                         }}
-                                    >
-                                        <MenuItem value="" disabled sx={{ color: 'rgba(0,0,0,0.5)' }}>
-                                            Select organization
-                                        </MenuItem>
-                                        {DEPARTMENTS.map((dept) => (
-                                            <MenuItem key={dept} value={dept}>
-                                                {dept}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
+                                    />
                                 </Box>
 
                                 <Box>

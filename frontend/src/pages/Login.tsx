@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     Container,
     Box,
@@ -36,6 +37,7 @@ import {
 } from '@mui/material';
 
 export default function Login() {
+    const theme = useTheme();
     const navigate = useNavigate();
     const { login, initSSO, verifyMFA } = useAuth();
     const [email, setEmail] = useState('');
@@ -103,7 +105,7 @@ export default function Login() {
     };
 
     return (
-        <InteractiveBackground>
+        <InteractiveBackground disableScroll>
             <Box
                 sx={{
                     position: 'absolute',
@@ -115,14 +117,15 @@ export default function Login() {
                 <IconButton
                     onClick={toggleMode}
                     sx={{
-                        bgcolor: mode === 'light' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.1)',
+                        bgcolor: 'background.paper',
                         backdropFilter: 'blur(8px)',
-                        color: mode === 'light' ? '#667eea' : '#ffffff',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        color: 'primary.main',
+                        boxShadow: 2,
                         transition: 'all 0.3s ease',
                         '&:hover': {
-                            bgcolor: mode === 'light' ? '#ffffff' : 'rgba(255, 255, 255, 0.2)',
+                            bgcolor: 'background.paper',
                             transform: 'translateY(-2px)',
+                            boxShadow: 4,
                         }
                     }}
                 >
@@ -133,46 +136,48 @@ export default function Login() {
                 <Box className="fade-in">
                     <Paper
                         elevation={0}
-                        className="glass"
                         sx={{
-                            p: 5,
+                            p: { xs: 2.5, sm: 3.5 },
                             borderRadius: 4,
-                            boxShadow: '0 24px 56px rgba(0,0,0,0.4)', // Stronger shadow for contrast
-                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                            background: 'rgba(23, 23, 23, 0.4)', // Darker, more contrasty glass background
+                            boxShadow: mode === 'dark' ? '0 24px 56px rgba(0,0,0,0.4)' : '0 24px 56px rgba(15, 23, 42, 0.1)',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            background: mode === 'dark' ? 'rgba(15, 23, 42, 0.8)' : alpha('#FFFFFF', 0.9),
                             backdropFilter: 'blur(24px)',
                         }}
                     >
                         {/* Logo/Header */}
-                        <Box sx={{ textAlign: 'center', mb: 4 }}>
+                        <Box sx={{ textAlign: 'center', mb: 2.5 }}>
                             <Box
                                 sx={{
-                                    width: 80,
-                                    height: 80,
+                                    width: 64,
+                                    height: 64,
                                     margin: '0 auto',
-                                    mb: 2,
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                    mb: 1.5,
+                                    background: mode === 'dark'
+                                        ? 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)'
+                                        : 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
                                     borderRadius: 3,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
+                                    boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.25)}`,
                                 }}
                             >
-                                <LoginIcon sx={{ fontSize: 40, color: 'white' }} />
+                                <LoginIcon sx={{ fontSize: 32, color: 'white' }} />
                             </Box>
                             <Typography
                                 variant="h4"
                                 fontWeight="bold"
                                 gutterBottom
                                 sx={{
-                                    color: 'white',
-                                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                                    color: 'text.primary',
+                                    letterSpacing: '-0.02em'
                                 }}
                             >
                                 Risk Assessment
                             </Typography>
-                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }} fontWeight={500}>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }} fontWeight={600}>
                                 Sign in to your account
                             </Typography>
                         </Box>
@@ -180,24 +185,16 @@ export default function Login() {
                         {error && (
                             <Alert
                                 severity="error"
-                                sx={{
-                                    mb: 3,
-                                    borderRadius: 2,
-                                    backdropFilter: 'blur(10px)',
-                                    bgcolor: 'rgba(211, 47, 47, 0.2)',
-                                    color: '#ffcdd2',
-                                    border: '1px solid rgba(239, 83, 80, 0.3)',
-                                    '& .MuiAlert-icon': { color: '#ef5350' }
-                                }}
+                                sx={{ mb: 3 }}
                             >
                                 {error}
                             </Alert>
                         )}
 
                         <Box component="form" onSubmit={handleSubmit} noValidate>
-                            <Stack spacing={2.5}>
+                            <Stack spacing={2}>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', mb: 1, ml: 0.5, fontWeight: 500 }}>
+                                    <Typography variant="body2" sx={{ color: 'text.primary', mb: 1, ml: 0.5, fontWeight: 700 }}>
                                         Email Address
                                     </Typography>
                                     <TextField
@@ -205,7 +202,7 @@ export default function Login() {
                                         fullWidth
                                         id="email"
                                         name="email"
-                                        placeholder="Enter your email"
+                                        placeholder="name@company.com"
                                         autoComplete="email"
                                         autoFocus
                                         value={email}
@@ -213,50 +210,21 @@ export default function Login() {
                                         InputProps={{
                                             startAdornment: (
                                                 <InputAdornment position="start">
-                                                    <Email sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                                                    <Email sx={{ color: 'text.secondary', fontSize: 20 }} />
                                                 </InputAdornment>
                                             ),
-                                        }}
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': {
-                                                bgcolor: 'rgba(0, 0, 0, 0.2)',
-                                                backdropFilter: 'blur(10px)',
-                                                borderRadius: 2,
-                                                color: 'white',
-                                                transition: 'all 0.2s',
-                                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                '&:hover': {
-                                                    bgcolor: 'rgba(0, 0, 0, 0.3)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                },
-                                                '&.Mui-focused': {
-                                                    bgcolor: 'rgba(0, 0, 0, 0.4)',
-                                                    boxShadow: '0 0 0 2px rgba(102, 126, 234, 0.5)',
-                                                    borderColor: 'rgba(102, 126, 234, 0.8)',
-                                                    '& fieldset': { border: 'none' },
-                                                },
-                                                '& fieldset': { border: 'none' },
-                                                '& .MuiInputBase-input': {
-                                                    py: 1.5,
-                                                    color: 'white',
-                                                    '&:-webkit-autofill': {
-                                                        transition: 'background-color 5000s ease-in-out 0s',
-                                                        WebkitTextFillColor: 'white !important',
-                                                    }
-                                                }
-                                            }
                                         }}
                                     />
                                 </Box>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', mb: 1, ml: 0.5, fontWeight: 500 }}>
+                                    <Typography variant="body2" sx={{ color: 'text.primary', mb: 1, ml: 0.5, fontWeight: 700 }}>
                                         Password
                                     </Typography>
                                     <TextField
                                         required
                                         fullWidth
                                         name="password"
-                                        placeholder="Enter your password"
+                                        placeholder="••••••••"
                                         type={showPassword ? 'text' : 'password'}
                                         id="password"
                                         autoComplete="current-password"
@@ -265,7 +233,7 @@ export default function Login() {
                                         InputProps={{
                                             startAdornment: (
                                                 <InputAdornment position="start">
-                                                    <Lock sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                                                    <Lock sx={{ color: 'text.secondary', fontSize: 20 }} />
                                                 </InputAdornment>
                                             ),
                                             endAdornment: (
@@ -273,41 +241,12 @@ export default function Login() {
                                                     <IconButton
                                                         onClick={() => setShowPassword(!showPassword)}
                                                         edge="end"
-                                                        sx={{ color: 'rgba(255,255,255,0.7)' }}
+                                                        sx={{ color: 'text.secondary' }}
                                                     >
                                                         {showPassword ? <VisibilityOff /> : <Visibility />}
                                                     </IconButton>
                                                 </InputAdornment>
                                             ),
-                                        }}
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': {
-                                                bgcolor: 'rgba(0, 0, 0, 0.2)',
-                                                backdropFilter: 'blur(10px)',
-                                                borderRadius: 2,
-                                                color: 'white',
-                                                transition: 'all 0.2s',
-                                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                '&:hover': {
-                                                    bgcolor: 'rgba(0, 0, 0, 0.3)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                },
-                                                '&.Mui-focused': {
-                                                    bgcolor: 'rgba(0, 0, 0, 0.4)',
-                                                    boxShadow: '0 0 0 2px rgba(102, 126, 234, 0.5)',
-                                                    borderColor: 'rgba(102, 126, 234, 0.8)',
-                                                    '& fieldset': { border: 'none' },
-                                                },
-                                                '& fieldset': { border: 'none' },
-                                                '& .MuiInputBase-input': {
-                                                    py: 1.5,
-                                                    color: 'white',
-                                                    '&:-webkit-autofill': {
-                                                        transition: 'background-color 5000s ease-in-out 0s',
-                                                        WebkitTextFillColor: 'white !important',
-                                                    }
-                                                }
-                                            }
                                         }}
                                     />
                                 </Box>
@@ -318,15 +257,9 @@ export default function Login() {
                                     size="large"
                                     disabled={loading}
                                     sx={{
-                                        py: 1.5,
+                                        py: 1.25,
                                         fontSize: '1rem',
-                                        fontWeight: 600,
-                                        boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        '&:hover': {
-                                            background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
-                                            boxShadow: '0 12px 32px rgba(102, 126, 234, 0.6)',
-                                        }
+                                        fontWeight: 700,
                                     }}
                                 >
                                     {loading ? 'Signing in...' : 'Sign In'}
@@ -340,11 +273,11 @@ export default function Login() {
                                         startIcon={<BusinessIcon />}
                                         onClick={() => setShowSsoDialog(!showSsoDialog)}
                                         sx={{
-                                            color: 'rgba(255,255,255,0.6)',
+                                            color: 'text.secondary',
                                             textTransform: 'none',
-                                            fontSize: '0.8rem',
+                                            fontWeight: 600,
                                             '&:hover': {
-                                                color: 'white',
+                                                color: 'primary.main',
                                                 bgcolor: 'transparent'
                                             }
                                         }}
@@ -360,12 +293,13 @@ export default function Login() {
                                             mt: 1,
                                             p: 2,
                                             borderRadius: 2,
-                                            bgcolor: 'rgba(255,255,255,0.03)',
-                                            border: '1px solid rgba(255,255,255,0.05)',
+                                            bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(15, 23, 42, 0.03)',
+                                            border: '1px solid',
+                                            borderColor: 'divider',
                                             animation: 'slideIn 0.3s ease-out'
                                         }}
                                     >
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1, display: 'block' }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1.5, display: 'block', fontWeight: 600 }}>
                                             Enter your company subdomain:
                                         </Typography>
                                         <Stack direction="row" spacing={1}>
@@ -374,21 +308,13 @@ export default function Login() {
                                                 placeholder="my-company"
                                                 value={subdomain}
                                                 onChange={(e) => setSubdomain(e.target.value)}
-                                                sx={{
-                                                    flex: 1,
-                                                    '& .MuiOutlinedInput-root': {
-                                                        color: 'white',
-                                                        fontSize: '0.875rem',
-                                                        bgcolor: 'rgba(0,0,0,0.2)',
-                                                        '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }
-                                                    }
-                                                }}
+                                                sx={{ flex: 1 }}
                                             />
                                             <Button
                                                 variant="contained"
                                                 size="small"
                                                 onClick={handleSsoSubmit}
-                                                sx={{ px: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                                                sx={{ px: 2 }}
                                             >
                                                 Go
                                             </Button>
@@ -397,18 +323,18 @@ export default function Login() {
                                 )}
                             </Stack>
 
-                            <Box sx={{ mt: 3, textAlign: 'center', p: 1, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.05)' }}>
+                            <Box sx={{ mt: 2.5, textAlign: 'center', p: 1, borderRadius: 2, bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(15, 23, 42, 0.03)' }}>
                                 <MuiLink
                                     component={Link}
                                     to="/register"
                                     variant="body2"
                                     sx={{
-                                        fontWeight: 600,
+                                        fontWeight: 700,
                                         textDecoration: 'none',
-                                        color: '#90caf9',
+                                        color: 'primary.main',
                                         display: 'block',
                                         '&:hover': {
-                                            color: '#ffffff',
+                                            color: 'primary.dark',
                                         },
                                     }}
                                 >
@@ -424,7 +350,7 @@ export default function Login() {
                         sx={{
                             display: 'block',
                             textAlign: 'center',
-                            mt: 3,
+                            mt: 2,
                             color: 'rgba(255, 255, 255, 0.5)',
                         }}
                     >

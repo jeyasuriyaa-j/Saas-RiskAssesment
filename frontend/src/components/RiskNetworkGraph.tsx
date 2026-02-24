@@ -33,21 +33,24 @@ export default function RiskNetworkGraph() {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // Update dimensions on resize
-        const handleResize = () => {
-            if (containerRef.current) {
+        if (!containerRef.current) return;
+
+        // Use ResizeObserver so we get IMMEDIATELY correct dimensions on mount
+        // (window 'resize' only fires when user resizes the window, not on first render)
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
                 setDimensions({
-                    w: containerRef.current.clientWidth,
-                    h: containerRef.current.clientHeight || 460
+                    w: Math.floor(width),
+                    h: Math.floor(height) || 460
                 });
             }
-        };
+        });
 
-        window.addEventListener('resize', handleResize);
-        handleResize();
-
-        return () => window.removeEventListener('resize', handleResize);
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
     }, []);
+
 
     useEffect(() => {
         fetchData();

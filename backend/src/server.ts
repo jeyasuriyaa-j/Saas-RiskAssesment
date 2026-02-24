@@ -37,7 +37,7 @@ import ssoRoutes from './routes/sso.routes';
 dotenv.config();
 
 const app: Application = express();
-const PORT = process.env.PORT || 9000;
+const PORT = process.env.PORT || 5000;
 logger.info(`Attempting to start server on port ${PORT} (env: ${process.env.PORT})`);
 
 // Middleware

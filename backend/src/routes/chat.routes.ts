@@ -20,34 +20,44 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: Respon
         return res.status(400).json({ error: 'Message is required' });
     }
 
-    logger.info(`Chat request from user ${user.userId} in tenant ${user.tenantId}`);
+    logger.info(`Chat request from user ${user.userId} (Role: ${user.role}) in tenant ${user.tenantId}`);
 
-    // 1. SMART BEHAVIOR: Handle simple queries directly
-    const lowerMessage = message.toLowerCase();
-    if (lowerMessage === 'hi' || lowerMessage === 'hello') {
+    // 1. Handle trivial greetings directly (no AI cost)
+    const lowerMessage = message.toLowerCase().trim();
+    if (lowerMessage === 'hi' || lowerMessage === 'hello' || lowerMessage === 'hey') {
         return res.json({ reply: `Hello! I'm your Risk Assistant. How can I help you today?` });
     }
 
     try {
-        // 2. FETCH DATA: Get filtered data based on permissions
-        const [risks, controls, events, users] = await Promise.all([
+        // 2. FETCH DATA in parallel: role-filtered data + user profile
+        const [risks, controls, events, users, remediationPlans, userProfile] = await Promise.all([
             permissionService.getFilteredRisks(user),
             permissionService.getFilteredControls(user),
             permissionService.getFilteredEvents(user),
-            permissionService.getFilteredUsers(user)
+            permissionService.getFilteredUsers(user),
+            permissionService.getFilteredRemediationPlans(user),
+            permissionService.getUserProfile(user.userId),
         ]);
 
-        // 3. BUILD CONTEXT: Create a summarize prompt context
-        const context = contextBuilder.buildContext({ risks, controls, events, users, user });
+        // 3. BUILD CONTEXT: Summarize all data into a structured text prompt
+        const context = contextBuilder.buildContext({
+            risks,
+            controls,
+            events,
+            users,
+            remediationPlans,
+            user,
+            userProfile
+        });
 
-        // 4. PREPARE MESSAGES: Combine system context, history, and new message
+        // 4. PREPARE MESSAGES: system context + limited history + new question
         const messages: ChatMessage[] = [
             { role: 'system', content: context },
-            ...history.slice(-10), // Limit history to last 10 messages for token efficiency
+            ...history.slice(-8).map((h: any) => ({ role: h.role, content: h.content })),
             { role: 'user', content: message }
         ];
 
-        // 5. CALL AI: Get response from the configured AI provider
+        // 5. CALL AI
         const reply = await aiProvider.askAI(messages);
 
         res.json({ reply });
