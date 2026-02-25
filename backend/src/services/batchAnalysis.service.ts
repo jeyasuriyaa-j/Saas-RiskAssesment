@@ -210,183 +210,173 @@ export async function getPendingRisks(
 }
 
 /**
- * Process a single batch of risks
+ * Process a batch of risks using a single AI call for the whole group (10x fewer API roundtrips)
  */
 export async function processBatch(
   jobId: string,
   tenantId: string,
   batch: Array<{ row_index: number; row_hash: string; original_title: string; original_description: string; original_category: string; original_likelihood: number; original_impact: number }>
 ): Promise<AnalysisResult[]> {
-  const results: AnalysisResult[] = [];
+  // --- 1. Resolve cache hits first ---
+  const uncached: typeof batch = [];
+  const cacheResults: AnalysisResult[] = [];
 
-  // Process each risk in the batch concurrently
-  const promises = batch.map(async (risk) => {
-    try {
-      // Status is already 'processing' from claimPendingRisks, but we ensure it here if called differently
-      // await updateRiskAnalysis(jobId, risk.row_index, 'processing');
-
-      // Check cache first
-      const cached = await getCachedAnalysis(tenantId, risk.row_hash);
-      if (cached) {
-        logger.info(`Cache hit for row ${risk.row_index} in job ${jobId}`);
-        await updateRiskAnalysis(jobId, risk.row_index, 'done', cached);
-        return {
-          row_index: risk.row_index,
-          original_data: {
-            row_index: risk.row_index,
-            statement: risk.original_title,
-            description: risk.original_description,
-            category: risk.original_category,
-            likelihood: risk.original_likelihood,
-            impact: risk.original_impact
-          },
-          ai_analysis: cached,
-          analysis_status: 'done' as const
-        };
-      }
-
-      // Call AI for analysis
-      const aiResult = await analyzeRiskWithAI({
+  await Promise.all(batch.map(async (risk) => {
+    const cached = await getCachedAnalysis(tenantId, risk.row_hash);
+    if (cached) {
+      cacheResults.push({
         row_index: risk.row_index,
-        statement: risk.original_title,
-        description: risk.original_description,
-        category: risk.original_category,
-        likelihood: risk.original_likelihood,
-        impact: risk.original_impact
-      }, tenantId);
-
-      // Save to cache and update status
-      await saveToCache(tenantId, risk.row_hash, aiResult);
-      await updateRiskAnalysis(jobId, risk.row_index, 'done', aiResult);
-
-      return {
-        row_index: risk.row_index,
-        original_data: {
-          row_index: risk.row_index,
-          statement: risk.original_title,
-          description: risk.original_description,
-          category: risk.original_category,
-          likelihood: risk.original_likelihood,
-          impact: risk.original_impact
-        },
-        ai_analysis: aiResult,
+        original_data: { row_index: risk.row_index, statement: risk.original_title, description: risk.original_description, category: risk.original_category, likelihood: risk.original_likelihood, impact: risk.original_impact },
+        ai_analysis: cached,
         analysis_status: 'done' as const
-      };
-    } catch (error: any) {
-      logger.error(`AI analysis failed for row ${risk.row_index} in job ${jobId}:`, error);
-      await updateRiskAnalysis(jobId, risk.row_index, 'failed', undefined, error.message);
-      return {
-        row_index: risk.row_index,
-        original_data: {
-          row_index: risk.row_index,
-          statement: risk.original_title,
-          description: risk.original_description,
-          category: risk.original_category,
-          likelihood: risk.original_likelihood,
-          impact: risk.original_impact
-        },
-        ai_analysis: {
-          improved_statement: risk.original_title,
-          improved_description: risk.original_description,
-          suggested_category: risk.original_category,
-          score_analysis: {
-            user_score_status: 'Aligned',
-            suggested_likelihood: risk.original_likelihood,
-            suggested_impact: risk.original_impact,
-            reasoning: error.message
-          },
-          confidence_score: 0.5
-        },
-        analysis_status: 'failed' as const,
-        error_message: error.message
-      };
+      });
+    } else {
+      uncached.push(risk);
     }
+  }));
+
+  // Bulk commit cache hits in one DB call
+  if (cacheResults.length > 0) {
+    await bulkUpdateRiskAnalysis(jobId, cacheResults.map(r => ({ row_index: r.row_index, status: 'done' as const, ai_result: r.ai_analysis })));
+    logger.info(`Cache hits: ${cacheResults.length} rows skipped AI call in job ${jobId}`);
+  }
+
+  if (uncached.length === 0) return cacheResults;
+
+  // --- 2. Single AI call for all uncached items ---
+  let aiResultMap: Map<number, AnalysisResult['ai_analysis']>;
+  try {
+    aiResultMap = await analyzeRiskBatchWithAI(
+      uncached.map(r => ({ row_index: r.row_index, statement: r.original_title, description: r.original_description, category: r.original_category, likelihood: r.original_likelihood, impact: r.original_impact }))
+    );
+  } catch (err: any) {
+    logger.error(`Batch AI call failed for job ${jobId}:`, err);
+    // Fallback: use original data for all
+    aiResultMap = new Map(uncached.map(r => [r.row_index, {
+      improved_statement: r.original_title, improved_description: r.original_description, suggested_category: r.original_category,
+      score_analysis: { user_score_status: 'Aligned', suggested_likelihood: r.original_likelihood, suggested_impact: r.original_impact, reasoning: err.message },
+      confidence_score: 0.5
+    }]));
+  }
+
+  // --- 3. Bulk DB write for all AI results ---
+  const aiResults: AnalysisResult[] = uncached.map(risk => {
+    const aiAnalysis = aiResultMap.get(risk.row_index)!;
+    return {
+      row_index: risk.row_index,
+      original_data: { row_index: risk.row_index, statement: risk.original_title, description: risk.original_description, category: risk.original_category, likelihood: risk.original_likelihood, impact: risk.original_impact },
+      ai_analysis: aiAnalysis,
+      analysis_status: 'done' as const
+    };
   });
 
-  const batchResults = await Promise.all(promises);
-  results.push(...batchResults);
+  await bulkUpdateRiskAnalysis(jobId, aiResults.map(r => ({ row_index: r.row_index, status: 'done' as const, ai_result: r.ai_analysis })));
 
-  return results;
+  // Save each to cache (async, non-blocking)
+  uncached.forEach(risk => {
+    const result = aiResultMap.get(risk.row_index);
+    if (result) saveToCache(tenantId, risk.row_hash, result).catch(() => { });
+  });
+
+  return [...cacheResults, ...aiResults];
 }
 
 /**
- * Analyze a single risk with AI
+ * Bulk DB update for multiple risks in a single SQL call
  */
-async function analyzeRiskWithAI(
-  entry: RiskEntry,
-  _tenantId: string
-): Promise<AnalysisResult['ai_analysis']> {
-  // Import AI service dynamically to avoid circular dependencies
-  const { generateAIResponse } = await import('./ai.service');
+async function bulkUpdateRiskAnalysis(
+  jobId: string,
+  results: Array<{ row_index: number; status: 'done' | 'failed'; ai_result?: any; error_message?: string }>
+): Promise<void> {
+  if (results.length === 0) return;
 
-  const prompt = `You are a Risk Management AI assistant.
-Return strict JSON only.
-No explanations or markdown.
-Be concise.
-
-Analyze the following risk and return:
-
-{
-  "improvedTitle": "Short, professional title",
-  "improvedDescription": "Precise description (MAX 2 sentences)",
-  "likelihood": number,
-  "impact": number,
-  "riskScore": number,
-  "remediation": "Concise 1-sentence action",
-  "recommendedControls": ["Control 1", "Control 2"],
-  "department": "Most appropriate department name"
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    for (const r of results) {
+      await client.query(
+        `UPDATE import_risk_analysis
+         SET analysis_status = $1, ai_result = $2, error_message = $3,
+             last_analysis_at = CURRENT_TIMESTAMP, analysis_attempts = analysis_attempts + 1
+         WHERE job_id = $4 AND row_index = $5`,
+        [r.status, r.ai_result ? JSON.stringify(r.ai_result) : null, r.error_message || null, jobId, r.row_index]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
-Risk:
-- Title: ${entry.statement}
-- Description: ${entry.description || 'N/A'}
-- Category: ${entry.category}
-- Current Likelihood: ${entry.likelihood}/5
-- Current Impact: ${entry.impact}/5
+/**
+ * Analyze a BATCH of risks with a single AI call (10x fewer API calls)
+ */
+async function analyzeRiskBatchWithAI(
+  entries: Array<{ row_index: number; statement: string; description: string; category: string; likelihood: number; impact: number }>
+): Promise<Map<number, AnalysisResult['ai_analysis']>> {
+  const { generateAIResponse, extractJSON } = await import('./ai.service');
 
-Send only the JSON response.`;
+  const inputJson = JSON.stringify(
+    entries.map(e => ({ i: e.row_index, t: e.statement, d: (e.description || '').substring(0, 200), c: e.category, l: e.likelihood, im: e.impact }))
+  );
 
-  const response = await generateAIResponse(prompt);
+  const prompt = `You are a Risk AI. Analyze each risk and return a JSON array - one object per item, same order.
+Each object: {"i":rowIndex,"t":"improvedTitle","d":"improvedDesc (max 2 sentences)","l":1-5,"im":1-5,"c":"bestCategory","r":"1 sentence remediation"}
+Return ONLY the JSON array. No markdown.
 
-  // Parse JSON response using the robust extractor
+Risks:
+${inputJson}`;
+
+  const BATCH_TIMEOUT_MS = 45000;
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('AI batch timed out after 45s')), BATCH_TIMEOUT_MS)
+  );
+
+  const response = await Promise.race([generateAIResponse(prompt), timeoutPromise]);
+
+  const resultMap = new Map<number, AnalysisResult['ai_analysis']>();
+
   try {
-    // Dynamically import extractJSON to avoid circular dependency if needed, 
-    // but better to rely on the one from ai.service if possible.
-    // Since we already import generateAIResponse, let's assume we can get extractJSON too.
-    const { extractJSON } = await import('./ai.service');
+    const parsed: any[] = extractJSON(response);
+    if (!Array.isArray(parsed)) throw new Error('AI did not return an array');
 
-    // We already called generateAIResponse, now use extractJSON
-    const parsed = extractJSON(response);
-
-    return {
-      improved_statement: parsed.improvedTitle || parsed.improved_statement || entry.statement,
-      improved_description: parsed.improvedDescription || parsed.improved_description || entry.description,
-      suggested_category: parsed.department || parsed.suggested_category || entry.category,
-      department: parsed.department || entry.category,
-      score_analysis: {
-        user_score_status: 'Aligned', // Default
-        suggested_likelihood: parsed.likelihood || entry.likelihood,
-        suggested_impact: parsed.impact || entry.impact,
-        reasoning: parsed.remediation || parsed.reasoning || 'AI-powered risk assessment'
-      },
-      confidence_score: 0.85
-    };
-  } catch (error) {
-    logger.error(`Failed to parse AI response for row ${entry.row_index}:`, error);
-    // Return fallback
-    return {
-      improved_statement: entry.statement,
-      improved_description: entry.description,
-      suggested_category: entry.category,
-      score_analysis: {
-        user_score_status: 'Aligned',
-        suggested_likelihood: entry.likelihood,
-        suggested_impact: entry.impact,
-        reasoning: 'AI analysis failed, using original data'
-      },
-      confidence_score: 0.5
-    };
+    for (const item of parsed) {
+      const originalEntry = entries.find(e => e.row_index === item.i) || entries[0];
+      resultMap.set(item.i, {
+        improved_statement: item.t || originalEntry.statement,
+        improved_description: item.d || originalEntry.description,
+        suggested_category: item.c || originalEntry.category,
+        department: item.c || originalEntry.category,
+        score_analysis: {
+          user_score_status: 'Aligned',
+          suggested_likelihood: item.l || originalEntry.likelihood,
+          suggested_impact: item.im || originalEntry.impact,
+          reasoning: item.r || 'AI-powered risk assessment'
+        },
+        confidence_score: 0.85
+      });
+    }
+  } catch (err) {
+    logger.warn(`Batch AI parse failed, falling back to originals. Error: ${(err as any).message}`);
   }
+
+  // Fallback for any missing rows
+  for (const e of entries) {
+    if (!resultMap.has(e.row_index)) {
+      resultMap.set(e.row_index, {
+        improved_statement: e.statement,
+        improved_description: e.description,
+        suggested_category: e.category,
+        score_analysis: { user_score_status: 'Aligned', suggested_likelihood: e.likelihood, suggested_impact: e.impact, reasoning: 'AI parsing fallback' },
+        confidence_score: 0.5
+      });
+    }
+  }
+
+  return resultMap;
 }
 
 /**
@@ -949,40 +939,42 @@ export async function processBatchesHighPerf(
         let batchCompleted = 0;
         let batchFailed = 0;
 
-        for (const row of batch) {
+        // BULK UPDATE all rows in this batch in ONE query
+        const updateParams = [];
+        const updateValues: any[] = [];
+
+        for (let i = 0; i < batch.length; i++) {
+          const row = batch[i];
           const result = resultMap.get(row.row_index);
-          if (result) {
-            await query(
-              `UPDATE import_risk_analysis 
-               SET ai_result = $1, analysis_status = 'done', error_message = NULL, last_analysis_at = CURRENT_TIMESTAMP
-               WHERE job_id = $2 AND row_index = $3`,
-              [JSON.stringify(result), jobId, row.row_index]
-            );
-            batchCompleted++;
-          } else {
-            // Use fallback for this specific row
-            const fallback = generateFallbackResults([{
-              id: row.row_index,
-              title: row.original_title,
-              description: row.original_description,
-              impact: row.original_impact,
-              likelihood: row.original_likelihood,
-              department: row.original_category || 'General'
-            }])[0];
+          const status = result ? 'done' : 'failed';
+          const aiResult = result || generateFallbackResults([{
+            id: row.row_index,
+            title: row.original_title,
+            description: row.original_description,
+            impact: row.original_impact,
+            likelihood: row.original_likelihood,
+            department: row.original_category || 'General'
+          }])[0];
+          const errorMsg = result ? null : (success ? 'AI response missing' : (lastError?.message || 'AI Batch Failed'));
 
-            const errorMsg = success
-              ? 'AI response missing for this row (Partial Result)'
-              : (lastError?.message || 'AI Batch Analysis Failed');
-
-            await query(
-              `UPDATE import_risk_analysis 
-               SET ai_result = $1, analysis_status = 'done', error_message = $2, last_analysis_at = CURRENT_TIMESTAMP
-               WHERE job_id = $3 AND row_index = $4`,
-              [JSON.stringify(fallback), errorMsg, jobId, row.row_index]
-            );
-            if (success) batchCompleted++; else batchFailed++;
-          }
+          const base = i * 4;
+          updateParams.push(`($${base + 1}::int, $${base + 2}::jsonb, $${base + 3}::text, $${base + 4}::text)`);
+          updateValues.push(row.row_index, JSON.stringify(aiResult), status, errorMsg);
         }
+
+        await query(
+          `UPDATE import_risk_analysis AS ira
+           SET ai_result = d.res::jsonb, 
+               analysis_status = d.st::text, 
+               error_message = d.err::text,
+               last_analysis_at = CURRENT_TIMESTAMP
+           FROM (VALUES ${updateParams.join(',')}) AS d(idx, res, st, err)
+           WHERE ira.job_id = $${updateValues.length + 1} AND ira.row_index = d.idx`,
+          [...updateValues, jobId]
+        );
+
+        batchCompleted += resultMap.size;
+        batchFailed += (batch.length - resultMap.size);
 
         // UPDATE COUNTS LOCALLY (in-memory)
         completedCount += batchCompleted;

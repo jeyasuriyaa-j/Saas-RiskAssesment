@@ -720,17 +720,23 @@ router.post('/jobs/:jobId/analyze-risks', authorize('admin', 'risk_manager', 'us
             const dataRows = rawRows.slice(headerRowIndex + 1);
 
             // Map rows to RiskInput
+            logger.info(`Job ${jobId}: Mappings: ${JSON.stringify(mappings)}`);
             const allMapped: RiskInput[] = dataRows.map((row, index) => {
                 const getColVal = (field: string) => {
                     const map = mappings.find((m: any) => m.mapped_to_field === field);
                     if (!map) return null;
-                    const colIdx = map.excel_column.charCodeAt(0) - 65;
+                    const colIdx = map.excel_column.toUpperCase().charCodeAt(0) - 65;
                     return row[colIdx];
                 };
 
+                const title = getColVal('risk_statement') || getColVal('statement') || getColVal('title');
+                if (index === 0) {
+                    logger.info(`Job ${jobId}: Sample Row 0: ${JSON.stringify(row)} -> Extracted Title: "${title}"`);
+                }
+
                 return {
-                    id: index, // Row index relative to data start
-                    title: getColVal('risk_statement') || getColVal('title') || '',
+                    id: index,
+                    title: title || '',
                     description: getColVal('description') || '',
                     impact: parseInt(getColVal('impact') || '3'),
                     likelihood: parseInt(getColVal('likelihood') || '3'),
@@ -738,10 +744,9 @@ router.post('/jobs/:jobId/analyze-risks', authorize('admin', 'risk_manager', 'us
                 };
             });
 
-            // CRITICAL: Filter out empty/placeholder rows — only analyze rows that have a real title.
-            // Empty trailing rows cause the AI to hallucinate placeholder risks like "Risk 2", "Risk 3".
+            // CRITICAL: Filter out empty/placeholder rows
             const inputs = allMapped.filter(r => r.title && r.title.trim().length > 0);
-            logger.info(`Job ${jobId}: ${dataRows.length} raw rows → ${inputs.length} non-empty rows to analyze.`);
+            logger.info(`Job ${jobId}: ${dataRows.length} raw rows → ${inputs.length} non-empty rows for analysis.`);
 
             // Bulk insert for high performance analysis
             await bulkInsertRisksHighPerf(jobId, tenantId, inputs);
