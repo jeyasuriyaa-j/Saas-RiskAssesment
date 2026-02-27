@@ -163,7 +163,7 @@ export default function Layout() {
                     overflow: 'hidden'
                 }}>
                     <img
-                        src={mode === 'dark' ? "/logo.png" : "/logo_color.png"}
+                        src="/logo_color.png"
                         alt="Logo"
                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                     />
