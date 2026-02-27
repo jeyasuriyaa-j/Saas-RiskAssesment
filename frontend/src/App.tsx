@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import RiskList from './pages/RiskList';
 import RiskDetail from './pages/RiskDetail';
 import ImportExcel from './pages/ImportExcel';
+import DocumentAnalysis from './pages/DocumentAnalysis';
 import AdminSettings from './pages/admin/Settings';
 import Users from './pages/admin/Users';
 import Controls from './pages/Controls';
@@ -19,6 +20,7 @@ import Governance from './pages/Governance';
 import ExecutiveReport from './pages/ExecutiveReport';
 import RiskMap from './pages/RiskMap';
 import MyRisks from './pages/MyRisks';
+import Vendors from './pages/Vendors';
 import Layout from './components/Layout';
 
 interface RoleRouteProps {
@@ -84,6 +86,7 @@ function App() {
                             <Route path="governance/report" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor', 'viewer']}><ExecutiveReport /></RoleRoute>} />
                             <Route path="governance/map" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor', 'viewer']}><RiskMap /></RoleRoute>} />
                             <Route path="import" element={<RoleRoute allowedRoles={['admin', 'risk_manager']}><ImportExcel /></RoleRoute>} />
+                            <Route path="import/files" element={<RoleRoute allowedRoles={['admin', 'risk_manager']}><DocumentAnalysis /></RoleRoute>} />
 
                             <Route path="incidents" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'user', 'auditor', 'viewer']}><Incidents /></RoleRoute>} />
                             <Route path="incidents/:eventId" element={<RoleRoute allowedRoles={['admin', 'risk_manager', 'user', 'auditor', 'viewer']}><IncidentDetail /></RoleRoute>} />
@@ -93,6 +96,14 @@ function App() {
                                 element={
                                     <RoleRoute allowedRoles={['admin', 'risk_manager']}>
                                         <Governance />
+                                    </RoleRoute>
+                                }
+                            />
+                            <Route
+                                path="governance/vendors"
+                                element={
+                                    <RoleRoute allowedRoles={['admin', 'risk_manager', 'auditor']}>
+                                        <Vendors />
                                     </RoleRoute>
                                 }
                             />

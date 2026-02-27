@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -16,10 +16,11 @@ import {
     Alert,
     Stack,
     Dialog,
-    Grow
+    Grow,
+    alpha
 } from '@mui/material';
-import { Close, Save, AttachFile } from '@mui/icons-material';
-import { myRisksAPI } from '../services/api';
+import { Close, Save, AttachFile, CloudUpload } from '@mui/icons-material';
+import api, { myRisksAPI } from '../services/api';
 import { format } from 'date-fns';
 
 interface MyRiskDrawerProps {
@@ -58,6 +59,9 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
     const [newNote, setNewNote] = useState('');
     const [status, setStatus] = useState('');
 
+    const [uploading, setUploading] = useState(false);
+    const [fileError, setFileError] = useState('');
+
     const fetchRiskDetail = useCallback(async () => {
         try {
             setLoading(true);
@@ -79,11 +83,54 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
         }
     }, [open, riskId, fetchRiskDetail]);
 
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            setUploading(true);
+            setFileError('');
+
+            // 1. Upload file to server (assuming a temporary upload or generic upload endpoint)
+            // For now, let's use the myRisksAPI.upload which seems to expect metadata
+            // Actually, we should use a proper FormData upload for the file.
+            // Looking at api.ts, myRisksAPI.upload takes riskId and metadata.
+            // We might need a separate multipart upload for the actual file first or use the myRisksAPI.upload as intended.
+
+            // Re-reading api.ts: myRisksAPI.upload: (riskId: string, data: { file_name: string; file_path: string; ... })
+            // Wait, this looks like it just saves metadata. We need the actual file upload.
+            // importAPI.upload is the only one with FormData.
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('taskId', riskId); // MyRiskDrawer's riskId is actually the task/plan ID/code
+            // We use the evidence API directly for GRC evidence
+            await api.post('evidence/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            // 2. Refresh detailed view to show new files
+            await fetchRiskDetail();
+            setSuccess('File uploaded successfully');
+        } catch (err: any) {
+            setFileError(err.response?.data?.message || 'Failed to upload file');
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const handleSave = async () => {
         try {
             setSaving(true);
             setError('');
             setSuccess('');
+
+            // Validation: Enforce evidence for COMPLETED status
+            if (status === 'COMPLETED' && (!risk?.files || risk.files.length === 0)) {
+                setError('You must upload at least one evidence file before completing this task.');
+                setSaving(false);
+                return;
+            }
 
             const updates: any = {};
             if (actionPlan !== risk?.action_plan) updates.action_plan = actionPlan;
@@ -102,10 +149,10 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
             // Refresh data
             await fetchRiskDetail();
 
-            // Close drawer after 1 second
+            // Close drawer after 1.5 seconds to let user see success
             setTimeout(() => {
                 onClose();
-            }, 1000);
+            }, 1500);
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to update task');
         } finally {
@@ -266,19 +313,78 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
                                 label="Status"
                                 onChange={(e) => setStatus(e.target.value)}
                             >
+                                <MenuItem value="OPEN">Open</MenuItem>
                                 <MenuItem value="ASSIGNED">Assigned</MenuItem>
                                 <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
                                 <MenuItem value="MITIGATED">Mitigated</MenuItem>
-                                <MenuItem value="COMPLETED">Completed</MenuItem>
+                                <MenuItem value="COMPLETED" disabled={!risk?.files || risk.files.length === 0}>
+                                    Completed {!risk?.files || risk.files.length === 0 ? '(Evidence Required)' : ''}
+                                </MenuItem>
                                 <MenuItem value="BLOCKED">Blocked</MenuItem>
                             </Select>
                         </FormControl>
+
+                        {/* Evidence Upload */}
+                        <Box sx={{ mb: 4 }}>
+                            <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                Evidence & Artifacts
+                                {(!risk.files || risk.files.length === 0) && (
+                                    <Chip label="Required for Completion" size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                )}
+                            </Typography>
+
+                            {fileError && <Alert severity="error" sx={{ mb: 2 }}>{fileError}</Alert>}
+
+                            <input
+                                type="file"
+                                id="evidence-upload"
+                                style={{ display: 'none' }}
+                                onChange={handleFileUpload}
+                                disabled={uploading}
+                            />
+                            <label htmlFor="evidence-upload">
+                                <Button
+                                    component="span"
+                                    variant="outlined"
+                                    fullWidth
+                                    startIcon={uploading ? <CircularProgress size={20} /> : <CloudUpload />}
+                                    disabled={uploading}
+                                    sx={{
+                                        py: 1.5,
+                                        borderStyle: 'dashed',
+                                        '&:hover': { borderStyle: 'dashed' }
+                                    }}
+                                >
+                                    {uploading ? 'Uploading...' : 'Upload Evidence File'}
+                                </Button>
+                            </label>
+
+                            {risk.files && risk.files.length > 0 && (
+                                <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    {risk.files.map((file: any) => (
+                                        <Chip
+                                            key={file.file_id || file.id}
+                                            icon={<AttachFile sx={{ fontSize: '1rem !important' }} />}
+                                            label={file.file_name}
+                                            size="small"
+                                            onDelete={() => { }} // TODO: Implement delete
+                                            variant="filled"
+                                            sx={{
+                                                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                                                color: 'primary.main',
+                                                borderColor: 'primary.light'
+                                            }}
+                                        />
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
 
                         {/* Action Plan */}
                         <TextField
                             fullWidth
                             multiline
-                            rows={6}
+                            rows={4}
                             label="Action Plan"
                             value={actionPlan}
                             onChange={(e) => setActionPlan(e.target.value)}
@@ -286,50 +392,33 @@ export default function MyRiskDrawer({ open, riskId, onClose }: MyRiskDrawerProp
                             sx={{ mb: 3 }}
                         />
 
-                        {/* Notes */}
+                        {/* Notes History */}
                         <Typography variant="subtitle2" gutterBottom>
-                            Notes / Comments
+                            Update Notes & History
                         </Typography>
                         {risk.notes && risk.notes.length > 0 && (
-                            <Paper variant="outlined" sx={{ p: 2, mb: 2, maxHeight: 200, overflow: 'auto' }}>
+                            <Paper variant="outlined" sx={{ p: 2, mb: 2, maxHeight: 150, overflow: 'auto', bgcolor: 'transparent' }}>
                                 {risk.notes.map((note: any, idx: number) => (
-                                    <Box key={idx} sx={{ mb: 1 }}>
+                                    <Box key={idx} sx={{ mb: 1, pb: 1, borderBottom: idx < risk.notes.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
                                         <Typography variant="caption" color="text.secondary">
-                                            {format(new Date(note.created_at), 'MMM d, yyyy h:mm a')}
+                                            {format(new Date(note.created_at), 'MMM d, PPp')}
                                         </Typography>
                                         <Typography variant="body2">{note.text}</Typography>
                                     </Box>
                                 ))}
                             </Paper>
                         )}
+
                         <TextField
                             fullWidth
                             multiline
                             rows={3}
-                            label="Add Note"
+                            label="Add New Note"
                             value={newNote}
                             onChange={(e) => setNewNote(e.target.value)}
                             placeholder="Add a comment or update..."
                             sx={{ mb: 3 }}
                         />
-
-                        {/* Files */}
-                        {risk.files && risk.files.length > 0 && (
-                            <Box sx={{ mb: 3 }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Attached Files
-                                </Typography>
-                                {risk.files.map((file: any) => (
-                                    <Chip
-                                        key={file.file_id}
-                                        icon={<AttachFile />}
-                                        label={file.file_name}
-                                        size="small"
-                                        sx={{ mr: 1, mb: 1 }}
-                                    />
-                                ))}
-                            </Box>
-                        )}
 
                         {/* Save Button */}
                         <Button

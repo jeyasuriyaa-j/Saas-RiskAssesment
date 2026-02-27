@@ -38,7 +38,8 @@ import {
     Moon,
     Sun,
     ChevronRight,
-    Shield as ShieldLogo
+    FileText,
+    Building2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useThemeMode } from '../contexts/ThemeModeContext';
@@ -100,7 +101,9 @@ export default function Layout() {
             { text: 'Incidents', icon: <AlertTriangle size={20} />, path: '/incidents', roles: ['admin', 'risk_manager', 'auditor', 'user', 'viewer'] },
             { text: 'Executive Board', icon: <BarChart3 size={20} />, path: '/governance/report', roles: ['admin', 'risk_manager', 'auditor', 'viewer'] },
             { text: 'Import Excel', icon: <Upload size={20} />, path: '/import', roles: ['admin', 'risk_manager'] },
+            { text: 'Import Files', icon: <FileText size={20} />, path: '/import/files', roles: ['admin', 'risk_manager'] },
             { text: 'AI Analysis', icon: <Brain size={20} />, path: '/governance', roles: ['admin', 'risk_manager'] },
+            { text: 'Vendor Risk', icon: <Building2 size={20} />, path: '/governance/vendors', roles: ['admin', 'risk_manager', 'auditor'] },
             { text: 'Users', icon: <UsersIcon size={20} />, path: '/admin/users', roles: ['admin'] },
             { text: 'Settings', icon: <SettingsIcon size={20} />, path: '/admin/settings', roles: ['admin'] },
         ];
@@ -152,24 +155,18 @@ export default function Layout() {
                     width: 48,
                     height: 48,
                     borderRadius: 3,
-                    background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
                     mr: 2,
                     position: 'relative',
                     overflow: 'hidden'
                 }}>
-                    <Box sx={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '50%',
-                        background: 'linear-gradient(to bottom, rgba(255,255,255,0.2), transparent)'
-                    }} />
-                    <ShieldLogo size={26} color="white" strokeWidth={2.5} />
+                    <img
+                        src={mode === 'dark' ? "/logo.png" : "/logo_color.png"}
+                        alt="Logo"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
                 </Box>
                 <Box>
                     <Typography variant="h5" fontWeight={800} sx={{

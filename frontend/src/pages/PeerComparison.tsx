@@ -72,7 +72,7 @@ const PeerComparison: React.FC = () => {
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h4" component="h1">
-                    Peer Comparison
+                    SWOT Peer Benchmarking
                 </Typography>
                 <FormControl sx={{ minWidth: 200 }}>
                     <InputLabel id="industry-select-label">Industry</InputLabel>

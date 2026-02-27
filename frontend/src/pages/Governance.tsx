@@ -296,7 +296,7 @@ export default function Governance() {
         <Box>
             <Box mb={4}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
-                    Governance & Compliance
+                    SWOT Governance
                 </Typography>
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     {(user?.role === 'admin' || user?.role === 'risk_manager' || user?.role === 'auditor') && (
@@ -405,12 +405,12 @@ export default function Governance() {
                                     <Warning color="warning" /> Unusual Patterns (Outliers)
                                 </Typography>
                                 <Stack spacing={2}>
-                                    {result.detected_outliers.length === 0 ? (
+                                    {result.detected_outliers?.length === 0 ? (
                                         <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
                                             <Typography color="text.secondary">No material outliers detected.</Typography>
                                         </Paper>
                                     ) : (
-                                        result.detected_outliers.map((outlier) => (
+                                        result.detected_outliers?.map((outlier) => (
                                             <Card key={outlier.risk_id} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
                                                 <CardContent sx={{ p: '16px !important' }}>
                                                     <Box display="flex" justifyContent="space-between" alignItems="flex-start">
@@ -448,8 +448,8 @@ export default function Governance() {
                                         </Typography>
                                         <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
                                             <List disablePadding>
-                                                {result.drift_trends.map((trend, idx) => (
-                                                    <ListItem key={idx} divider={idx !== result.drift_trends.length - 1}>
+                                                {result.drift_trends?.map((trend, idx) => (
+                                                    <ListItem key={idx} divider={idx !== (result.drift_trends?.length || 0) - 1}>
                                                         <ListItemIcon><InfoOutlined color="info" /></ListItemIcon>
                                                         <ListItemText primary={trend} />
                                                     </ListItem>
@@ -463,8 +463,8 @@ export default function Governance() {
                                         </Typography>
                                         <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
                                             <List disablePadding>
-                                                {result.justification_required.map((req, idx) => (
-                                                    <ListItem key={idx} divider={idx !== result.justification_required.length - 1}>
+                                                {result.justification_required?.map((req, idx) => (
+                                                    <ListItem key={idx} divider={idx !== (result.justification_required?.length || 0) - 1}>
                                                         <ListItemIcon><Warning color="secondary" sx={{ fontSize: 20 }} /></ListItemIcon>
                                                         <ListItemText primary={req} primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} />
                                                     </ListItem>
@@ -494,7 +494,7 @@ export default function Governance() {
                                     onClick={() => setIsAddFwModalOpen(true)}
                                     sx={{ textTransform: 'none' }}
                                 >
-                                    Log Reg
+                                    Add Framework
                                 </Button>
                             </Box>
                             <Paper sx={{ borderRadius: 3, p: 2 }}>
@@ -690,7 +690,7 @@ export default function Governance() {
                             {learningRecs.length === 0 ? (
                                 <Grid item xs={12}>
                                     <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-                                        <Typography color="text.secondary">No new learning recommendations. Your risk assessments match current incident patterns.</Typography>
+                                        <Typography color="text.secondary">No new learning recommendations. Your SWOT risk assessments match current incident patterns.</Typography>
                                     </Paper>
                                 </Grid>
                             ) : (

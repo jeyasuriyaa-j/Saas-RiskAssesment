@@ -198,6 +198,18 @@ router.put('/:riskId/task', asyncHandler(async (req: AuthRequest, res: Response)
         if (!validStatuses.includes(status)) {
             throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
         }
+
+        // ENFORCE EVIDENCE: Block COMPLETED if no files uploaded
+        if (status === 'COMPLETED') {
+            const filesCheck = await query(
+                'SELECT count(*) FROM task_files WHERE task_id = $1',
+                [task.plan_id]
+            );
+            if (parseInt(filesCheck.rows[0].count) === 0) {
+                throw new AppError('Cannot complete task without uploading evidence first.', 400);
+            }
+        }
+
         updates.push(`status = $${paramIndex++}`);
         params.push(status);
     }

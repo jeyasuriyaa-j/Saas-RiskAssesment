@@ -77,7 +77,7 @@ export default function ExecutiveReport() {
         <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 4 } }}>
             {/* Header Section */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={6} className="no-print ExecutiveReport-header">
-                <Typography variant="h4" fontWeight="bold">Executive Board Deck</Typography>
+                <Typography variant="h4" fontWeight="bold">SWOT Executive Briefings</Typography>
                 <Button
                     variant="contained"
                     startIcon={<PrintIcon />}

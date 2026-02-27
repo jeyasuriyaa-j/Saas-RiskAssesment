@@ -30,8 +30,8 @@ import {
     alpha,
     useTheme
 } from '@mui/material';
-import { riskAPI, aiAPI, controlsAPI, remediationAPI, usersAPI } from '../services/api';
-import { Psychology, Refresh, AutoAwesome, Warning, Info, TrendingUp, CheckCircle, Save, ArrowBack, History as HistoryIcon, CompareArrows, Add, HealthAndSafety, Shield, Assessment, Bolt } from '@mui/icons-material';
+import { riskAPI, aiAPI, controlsAPI, remediationAPI, usersAPI, eventsAPI } from '../services/api';
+import { Psychology, Refresh, AutoAwesome, Warning, Info, TrendingUp, CheckCircle, Save, ArrowBack, History as HistoryIcon, CompareArrows, Add, HealthAndSafety, Shield, Assessment, Bolt, Link as LinkIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import AssignedTasksSection from '../components/AssignedTasksSection';
@@ -90,6 +90,10 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
         priority: 'MEDIUM'
     });
 
+    // Linked Incidents State
+    const [linkedIncidents, setLinkedIncidents] = useState<any[]>([]);
+    const [incidentsLoading, setIncidentsLoading] = useState(false);
+
     const handleRunAnalysis = useCallback(async (force: boolean = false) => {
         if (!riskId || riskId === 'new') return;
 
@@ -109,6 +113,19 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
         }
     }, [riskId]);
 
+    const fetchLinkedIncidents = useCallback(async () => {
+        if (!riskId || riskId === 'new') return;
+        setIncidentsLoading(true);
+        try {
+            const response = await eventsAPI.getByRisk(riskId);
+            setLinkedIncidents(response.data.events || []);
+        } catch (err) {
+            console.error('Failed to fetch linked incidents', err);
+        } finally {
+            setIncidentsLoading(false);
+        }
+    }, [riskId]);
+
     const fetchRisk = useCallback(async () => {
         setLoading(true);
         try {
@@ -123,12 +140,15 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
             if (!riskData.analysis && riskId !== 'new') {
                 handleRunAnalysis(false);
             }
+
+            // Fetch linked incidents
+            fetchLinkedIncidents();
         } catch (err) {
             setError('Failed to fetch risk details');
         } finally {
             setLoading(false);
         }
-    }, [riskId, handleRunAnalysis]);
+    }, [riskId, handleRunAnalysis, fetchLinkedIncidents]);
 
     useEffect(() => {
         if (riskId === 'new') {
@@ -511,6 +531,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                     <Tab label="Details" />
                     {user?.role !== 'user' && <Tab label="Controls & Remediation" disabled={riskId === 'new'} />}
                     {user?.role !== 'user' && <Tab label="History" disabled={riskId === 'new'} />}
+                    <Tab icon={<LinkIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Incidents${linkedIncidents.length > 0 ? ` (${linkedIncidents.length})` : ''}`} disabled={riskId === 'new'} />
                 </Tabs>
             </Box>
 
@@ -656,7 +677,7 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                                     </Box>
                                     <Box>
                                         <Typography variant="h6" fontWeight="700">AI Strategic Insights</Typography>
-                                        <Typography variant="caption" sx={{ opacity: 0.6 }}>Deep-learning risk assessment</Typography>
+                                        <Typography variant="caption" sx={{ opacity: 0.6 }}>Deep-learning SWOT assessment</Typography>
                                     </Box>
                                 </Box>
                                 <Box>
@@ -1142,6 +1163,58 @@ export default function RiskDetail({ riskId: propRiskId, onClose }: RiskDetailPr
                             </TableBody>
                         </Table>
                     </TableContainer>
+                </Paper>
+            )}
+
+            {/* TAB 3: LINKED INCIDENTS */}
+            {activeTab === (user?.role !== 'user' ? 3 : 1) && (
+                <Paper sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <LinkIcon sx={{ mr: 1, color: 'primary.main' }} />
+                            <Typography variant="h6">Linked Incidents</Typography>
+                        </Box>
+                        {linkedIncidents.length > 0 && (
+                            <Chip label={`${linkedIncidents.length} incident${linkedIncidents.length > 1 ? 's' : ''}`} color="error" size="small" variant="outlined" />
+                        )}
+                    </Box>
+                    <Divider sx={{ mb: 2 }} />
+                    {incidentsLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
+                    ) : linkedIncidents.length === 0 ? (
+                        <Box sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography color="text.secondary">No incidents linked to this risk yet.</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Link incidents from the Incidents & Events page when reporting new events.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Stack spacing={2}>
+                            {linkedIncidents.map((incident: any) => (
+                                <Card key={incident.event_id} variant="outlined" sx={{ borderRadius: 2 }}>
+                                    <CardContent sx={{ pb: '12px !important' }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                            <Typography variant="subtitle1" fontWeight={600}>{incident.event_name}</Typography>
+                                            <Chip
+                                                label={incident.severity}
+                                                size="small"
+                                                color={incident.severity === 'CRITICAL' ? 'error' : incident.severity === 'HIGH' ? 'warning' : 'info'}
+                                            />
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                            {incident.description || 'No description provided.'}
+                                        </Typography>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Chip label={incident.event_type} size="small" variant="outlined" />
+                                            <Typography variant="caption" color="text.secondary">
+                                                Occurred: {incident.occurred_at ? format(new Date(incident.occurred_at), 'PPP') : 'N/A'}
+                                            </Typography>
+                                        </Stack>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </Stack>
+                    )}
                 </Paper>
             )}
 

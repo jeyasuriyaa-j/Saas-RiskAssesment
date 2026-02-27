@@ -117,7 +117,7 @@ export default function Vendors() {
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
                 <Box>
                     <Typography variant="h4" fontWeight="bold" gutterBottom>
-                        Vendor Risk Management
+                        SWOT Vendor Risk
                     </Typography>
                     <Typography color="text.secondary">
                         Manage and assess third-party risk profiles
@@ -251,7 +251,7 @@ export default function Vendors() {
                                             </TableCell>
                                             <TableCell>
                                                 <Stack direction="row" spacing={1}>
-                                                    <Tooltip title="AI Risk Assessment">
+                                                    <Tooltip title="AI SWOT Assessment">
                                                         <IconButton size="small" color="secondary" onClick={() => { setSelectedVendor(vendor); setIsAssessModalOpen(true); }}>
                                                             <Assessment fontSize="small" />
                                                         </IconButton>
@@ -314,7 +314,7 @@ export default function Vendors() {
                     {!selectedVendor?.assessment_data ? (
                         <>
                             <Typography variant="body2" color="text.secondary" mb={3}>
-                                You are about to run an automated risk assessment for <strong>{selectedVendor?.vendor_name}</strong>.
+                                You are about to run an automated SWOT assessment for <strong>{selectedVendor?.vendor_name}</strong>.
                                 The AI will analyze known security data and historical performance to generate a risk score.
                             </Typography>
                             <Alert icon={<InfoOutlined />} severity="info" sx={{ mb: 4, borderRadius: 2 }}>

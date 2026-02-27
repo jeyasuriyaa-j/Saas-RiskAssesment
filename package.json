@@ -1,7 +1,7 @@
 {
-  "name": "risk-assessment-saas",
+  "name": "swot-risk-platform",
   "version": "1.0.0",
-  "description": "Enterprise-grade risk management platform that replaces Excel with intelligent, automated risk assessment.",
+  "description": "SWOT RISK — Enterprise-grade AI-powered risk management platform.",
   "main": "index.js",
   "scripts": {
     "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend && npm install --prefix landing",

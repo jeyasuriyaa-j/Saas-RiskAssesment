@@ -24,12 +24,19 @@ import {
     useMediaQuery,
     useTheme,
     Card,
-    CardContent
+    CardContent,
+    Autocomplete
 } from '@mui/material';
-import { Add, Assessment } from '@mui/icons-material';
-import { eventsAPI } from '../services/api';
+import { Add, Assessment, Link as LinkIcon } from '@mui/icons-material';
+import { eventsAPI, riskAPI } from '../services/api';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
+
+interface RiskOption {
+    risk_id: string;
+    risk_code: string;
+    title: string;
+}
 
 export default function Incidents() {
     const navigate = useNavigate();
@@ -47,6 +54,9 @@ export default function Incidents() {
         severity: 'MEDIUM',
         occurred_at: format(new Date(), 'yyyy-MM-dd')
     });
+    const [selectedRisks, setSelectedRisks] = useState<RiskOption[]>([]);
+    const [riskOptions, setRiskOptions] = useState<RiskOption[]>([]);
+    const [riskSearchLoading, setRiskSearchLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -65,12 +75,32 @@ export default function Incidents() {
         }
     };
 
+    const fetchRiskOptions = async () => {
+        if (riskOptions.length > 0) return; // already loaded
+        setRiskSearchLoading(true);
+        try {
+            const response = await riskAPI.list({ limit: 500 });
+            const risks = (response.data.risks || response.data || []).filter((r: any) => r.status !== 'CLOSED');
+            setRiskOptions(risks.map((r: any) => ({
+                risk_id: r.risk_id,
+                risk_code: r.risk_code || 'N/A',
+                title: r.statement || r.title || r.risk_statement || 'Untitled Risk'
+            })));
+        } catch (err) {
+            console.error('Failed to load risks for linking', err);
+        } finally {
+            setRiskSearchLoading(false);
+        }
+    };
+
     const handleCreate = async () => {
         try {
-            await eventsAPI.create(formData);
+            await eventsAPI.create({
+                ...formData,
+                affected_risk_ids: selectedRisks.map(r => r.risk_id)
+            });
             setOpenDialog(false);
             fetchEvents();
-            // Reset form
             setFormData({
                 event_name: '',
                 event_type: 'INCIDENT',
@@ -78,6 +108,7 @@ export default function Incidents() {
                 severity: 'MEDIUM',
                 occurred_at: format(new Date(), 'yyyy-MM-dd')
             });
+            setSelectedRisks([]);
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to create event');
         }
@@ -95,11 +126,11 @@ export default function Incidents() {
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4">Incidents & Events</Typography>
+                <Typography variant="h4">SWOT Incident Management</Typography>
                 <Button
                     variant="contained"
                     startIcon={<Add />}
-                    onClick={() => setOpenDialog(true)}
+                    onClick={() => { setOpenDialog(true); fetchRiskOptions(); }}
                     color="error"
                 >
                     Report Incident
@@ -128,7 +159,12 @@ export default function Incidents() {
                                     {event.description}
                                 </Typography>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Chip label={event.event_type} size="small" variant="outlined" />
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Chip label={event.event_type} size="small" variant="outlined" />
+                                        {event.affected_risk_ids?.length > 0 && (
+                                            <Chip icon={<LinkIcon sx={{ fontSize: 14 }} />} label={`${event.affected_risk_ids.length} Linked`} size="small" color="primary" variant="outlined" />
+                                        )}
+                                    </Stack>
                                     {canAnalyze && (
                                         <Button
                                             variant="outlined"
@@ -158,6 +194,7 @@ export default function Incidents() {
                                 <TableCell>Event Name</TableCell>
                                 <TableCell>Type</TableCell>
                                 <TableCell>Severity</TableCell>
+                                <TableCell>Linked Risks</TableCell>
                                 <TableCell>Description</TableCell>
                                 <TableCell>Actions</TableCell>
                             </TableRow>
@@ -174,6 +211,13 @@ export default function Incidents() {
                                             color={getSeverityColor(event.severity) as any}
                                             size="small"
                                         />
+                                    </TableCell>
+                                    <TableCell>
+                                        {event.affected_risk_ids?.length > 0 ? (
+                                            <Chip icon={<LinkIcon sx={{ fontSize: 14 }} />} label={`${event.affected_risk_ids.length} Linked`} size="small" color="primary" variant="outlined" />
+                                        ) : (
+                                            <Typography variant="caption" color="text.secondary">None</Typography>
+                                        )}
                                     </TableCell>
                                     <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {event.description}
@@ -222,7 +266,7 @@ export default function Incidents() {
                         >
                             <MenuItem value="INCIDENT">Incident</MenuItem>
                             <MenuItem value="NEAR_MISS">Near Miss</MenuItem>
-                            <MenuItem value="BREACH">Security Breach</MenuItem>
+                            <MenuItem value="SECURITY_BREACH">Security Breach</MenuItem>
                             <MenuItem value="AUDIT_FINDING">Audit Finding</MenuItem>
                         </TextField>
 
@@ -248,6 +292,59 @@ export default function Incidents() {
                             onChange={(e) => setFormData({ ...formData, occurred_at: e.target.value })}
                         />
 
+                        <Autocomplete
+                            multiple
+                            options={riskOptions}
+                            loading={riskSearchLoading}
+                            value={selectedRisks}
+                            onChange={(_, newValue) => setSelectedRisks(newValue)}
+                            getOptionLabel={(option) => `${option.risk_code}: ${option.title}`}
+                            isOptionEqualToValue={(option, value) => option.risk_id === value.risk_id}
+                            PaperComponent={(props) => (
+                                <Paper
+                                    {...(props as any)}
+                                    sx={{
+                                        ...(props as any).sx,
+                                        backgroundColor: theme.palette.mode === 'dark' ? '#0F172A' : '#FFFFFF',
+                                        backgroundImage: 'none',
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                                        opacity: 1,
+                                    }}
+                                />
+                            )}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Link to Risks (optional)"
+                                    placeholder="Search risks..."
+                                    helperText="Connect this incident to risks in the register"
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        endAdornment: (
+                                            <>
+                                                {riskSearchLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                {params.InputProps.endAdornment}
+                                            </>
+                                        ),
+                                    }}
+                                />
+                            )}
+                            renderTags={(value, getTagProps) =>
+                                value.map((option, index) => (
+                                    <Chip
+                                        {...getTagProps({ index })}
+                                        key={option.risk_id}
+                                        label={option.risk_code}
+                                        size="small"
+                                        color="primary"
+                                        variant="outlined"
+                                    />
+                                ))
+                            }
+                        />
+
                         <TextField
                             label="Description"
                             multiline
@@ -266,3 +363,5 @@ export default function Incidents() {
         </Box>
     );
 }
+
+

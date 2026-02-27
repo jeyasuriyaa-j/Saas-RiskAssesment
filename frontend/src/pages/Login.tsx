@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { alpha, useTheme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import {
     Container,
     Box,
@@ -21,7 +21,6 @@ import {
     VpnKey as VpnKeyIcon,
     Visibility,
     VisibilityOff,
-    Login as LoginIcon,
     DarkMode,
     LightMode,
 } from '@mui/icons-material';
@@ -37,7 +36,6 @@ import {
 } from '@mui/material';
 
 export default function Login() {
-    const theme = useTheme();
     const navigate = useNavigate();
     const { login, initSSO, verifyMFA } = useAuth();
     const [email, setEmail] = useState('');
@@ -150,21 +148,20 @@ export default function Login() {
                         <Box sx={{ textAlign: 'center', mb: 2.5 }}>
                             <Box
                                 sx={{
-                                    width: 64,
-                                    height: 64,
+                                    width: 80,
+                                    height: 80,
                                     margin: '0 auto',
                                     mb: 1.5,
-                                    background: mode === 'dark'
-                                        ? 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)'
-                                        : 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
-                                    borderRadius: 3,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.25)}`,
                                 }}
                             >
-                                <LoginIcon sx={{ fontSize: 32, color: 'white' }} />
+                                <img
+                                    src="/logo_color.png"
+                                    alt="SWOT Risk Logo"
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                />
                             </Box>
                             <Typography
                                 variant="h4"
@@ -175,7 +172,7 @@ export default function Login() {
                                     letterSpacing: '-0.02em'
                                 }}
                             >
-                                Risk Assessment
+                                SWOT RISK
                             </Typography>
                             <Typography variant="body2" sx={{ color: 'text.secondary' }} fontWeight={600}>
                                 Sign in to your account
@@ -354,7 +351,7 @@ export default function Login() {
                             color: 'rgba(255, 255, 255, 0.5)',
                         }}
                     >
-                        © 2026 Risk Assessment Platform. All rights reserved.
+                        © 2026 SWOT RISK Platform. All rights reserved.
                     </Typography>
                 </Box>
             </Container>

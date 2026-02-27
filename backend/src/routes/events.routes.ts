@@ -138,6 +138,25 @@ router.post('/', authorize('admin', 'risk_manager', 'user'), asyncHandler(async 
 }));
 
 /**
+ * Get events linked to a specific risk
+ * GET /api/v1/events/by-risk/:riskId
+ */
+router.get('/by-risk/:riskId', asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { tenantId } = req.user!;
+    const { riskId } = req.params;
+
+    const result = await query(
+        `SELECT event_id, event_name, event_type, severity, description, occurred_at, reported_at
+         FROM events 
+         WHERE tenant_id = $1 AND $2 = ANY(affected_risk_ids)
+         ORDER BY occurred_at DESC`,
+        [tenantId, riskId]
+    );
+
+    res.json({ events: result.rows });
+}));
+
+/**
  * Get event by ID
  * GET /api/v1/events/:eventId
  */
@@ -234,7 +253,10 @@ router.get('/:eventId/risk-assessments/:requestId', asyncHandler(async (req: Aut
         return;
     }
 
-    res.json(row.suggestion);
+    res.json({
+        status: 'COMPLETED',
+        suggestion: row.suggestion
+    });
 }));
 
 export default router;

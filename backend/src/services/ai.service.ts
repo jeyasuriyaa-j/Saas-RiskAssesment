@@ -346,8 +346,40 @@ export async function recommendControls(riskStatement: string, riskDescription: 
 }
 
 export async function analyzeDocument(fileContent: string, fileName: string, fileType: string) {
-  const prompt = `Analyze document: ${fileName} (${fileType}). Content: ${fileContent.substring(0, 5000)}
-  Return JSON: { "document_type": "...", "summary": "...", "key_findings": [], "risk_relevance_score": 90 }`;
+  const prompt = `System Role: You are a senior Chief Risk Officer (CRO) and Strategic Auditor.
+  Analyze the following document to extract high-value risk intelligence.
+  
+  Document Metadata:
+  - Name: ${fileName}
+  - Type: ${fileType}
+  
+  Content Analysis (First 8000 chars):
+  ${fileContent.substring(0, 8000)}
+  
+  Tasks:
+  1. Identify the core purpose of this document.
+  2. Provide a concise, board-level summary.
+  3. Extract at least 5 key findings related to enterprise risk or operational gaps.
+  4. Suggest specific, actionable mitigation or strategic steps.
+  5. Score the relevance to enterprise risk (0-100) and your confidence in this analysis (0-100).
+  6. Extract relevant metadata (e.g., date ranges, categories, total items).
+
+  Return JSON ONLY:
+  {
+    "document_type": "...",
+    "purpose": "...",
+    "summary": "...",
+    "key_findings": ["...", "..."],
+    "suggested_actions": ["...", "..."],
+    "risk_relevance_score": 0-100,
+    "confidence_score": 0-100,
+    "metadata": {
+      "total_items": 0,
+      "categories_found": ["...", "..."],
+      "date_range": "..."
+    }
+  }`;
+
   const text = await generateAIResponse(prompt);
   return extractJSON(text);
 }

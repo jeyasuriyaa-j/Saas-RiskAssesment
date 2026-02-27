@@ -31,36 +31,98 @@ const upload = multer({
 
 // Upload evidence
 router.post('/upload', upload.single('file'), asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { tenantId, userId } = req.user!;
-    const { controlId } = req.body;
+    const { tenantId, userId, email } = req.user!;
+    const { controlId, riskId, description, tags } = req.body;
     const file = req.file;
 
     if (!file) throw new AppError('No file uploaded', 400);
-    if (!controlId) {
+    if (!controlId && !riskId) {
         // Clean up file if metadata missing
         fs.unlinkSync(file.path);
-        throw new AppError('Control ID is required', 400);
+        throw new AppError('Control ID or Risk ID is required', 400);
     }
 
-    // Verify control belongs to tenant
-    const controlCheck = await query(
-        'SELECT * FROM controls WHERE control_id = $1 AND tenant_id = $2',
-        [controlId, tenantId]
-    );
+    // Verify ownership if controlId provided
+    if (controlId) {
+        const controlCheck = await query(
+            'SELECT * FROM controls WHERE control_id = $1 AND tenant_id = $2',
+            [controlId, tenantId]
+        );
+        if (controlCheck.rows.length === 0) {
+            fs.unlinkSync(file.path);
+            throw new AppError('Control not found', 404);
+        }
+    }
 
-    if (controlCheck.rows.length === 0) {
-        fs.unlinkSync(file.path);
-        throw new AppError('Control not found', 404);
+    // Verify ownership if riskId provided
+    if (riskId) {
+        const riskCheck = await query(
+            'SELECT * FROM risks WHERE (risk_id = $1 OR risk_code = $1) AND tenant_id = $2',
+            [riskId, tenantId]
+        );
+        if (riskCheck.rows.length === 0) {
+            fs.unlinkSync(file.path);
+            throw new AppError('Risk not found', 404);
+        }
+    }
+
+    const { taskId } = req.body;
+    let finalPlanId = null;
+
+    if (taskId) {
+        const taskResult = await query(
+            `SELECT rp.plan_id FROM remediation_plans rp 
+             JOIN risks r ON rp.risk_id = r.risk_id
+             WHERE (rp.plan_id = $1 OR r.risk_code = $1) AND rp.tenant_id = $2`,
+            [taskId, tenantId]
+        );
+        if (taskResult.rows.length > 0) {
+            finalPlanId = taskResult.rows[0].plan_id;
+        }
     }
 
     const result = await query(
         `INSERT INTO evidence (
-            tenant_id, control_id, file_name, file_path, file_size_bytes, mime_type, uploaded_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [tenantId, controlId, file.originalname, file.path, file.size, file.mimetype, userId]
+            tenant_id, control_id, risk_id, file_name, file_path, file_size_bytes, file_type, uploaded_by, description, tags
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        [
+            tenantId,
+            controlId || null,
+            riskId || null,
+            file.originalname,
+            file.path,
+            file.size,
+            file.mimetype,
+            userId,
+            description || null,
+            tags ? (Array.isArray(tags) ? tags : [tags]) : null
+        ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const newEvidence = result.rows[0];
+
+    // If it's a task, also sync with task_files
+    if (finalPlanId) {
+        await query(
+            `INSERT INTO task_files (task_id, file_name, file_path, file_size, mime_type, uploaded_by, tenant_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [finalPlanId, file.originalname, file.path, file.size, file.mimetype, userId, tenantId]
+        );
+    }
+
+    // Log audit
+    const { auditService } = await import('../services/audit.service');
+    await auditService.logAction({
+        tenant_id: tenantId,
+        entity_type: 'EVIDENCE',
+        entity_id: newEvidence.evidence_id,
+        action: 'CREATE',
+        actor_user_id: userId,
+        actor_name: email,
+        changes: { file_name: file.originalname, controlId, riskId, taskId }
+    });
+
+    res.status(201).json(newEvidence);
 }));
 
 // List evidence for a control

@@ -177,7 +177,7 @@ const Dashboard = () => {
                 <Box mb={6} display="flex" justifyContent="space-between" alignItems="flex-end">
                     <Box>
                         <Typography variant="overline" sx={{ mb: 1, color: 'primary.main', fontWeight: 900, letterSpacing: 2 }}>
-                            Risk Intelligence Platform
+                            SWOT RISK Intelligence
                         </Typography>
                         <Typography variant="h3" fontWeight="900" sx={{ letterSpacing: '-0.04em', color: 'text.primary' }}>
                             {user?.role === 'viewer' ? 'Executive ' : ''}Analytics <span className={mode === 'dark' ? "text-gradient-vibrant" : ""}>Overview</span>

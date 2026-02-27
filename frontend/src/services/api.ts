@@ -208,6 +208,7 @@ export const eventsAPI = {
     list: (params?: any) => api.get('events', { params }),
     create: (data: any) => api.post('events', data),
     get: (eventId: string) => api.get(`events/${eventId}`),
+    getByRisk: (riskId: string) => api.get(`events/by-risk/${riskId}`),
     assessImpact: (eventId: string, data: any) => api.post(`events/${eventId}/assess-risk-impact`, data),
     getAssessment: (eventId: string, requestId: string) => api.get(`events/${eventId}/risk-assessments/${requestId}`),
 };

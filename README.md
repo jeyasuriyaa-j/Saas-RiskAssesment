@@ -1,6 +1,6 @@
-# SWOT Risk Assessment System
+# SWOT RISK Platform
 
-An AI-powered Enterprise Risk Management (ERM) SaaS platform designed for high-performance risk identification, automated control mapping, and SOC2 compliance readiness.
+An AI-powered Enterprise Risk Management (ERM) SaaS platform designed for high-performance risk identification, automated control mapping, vendor risk assessment, and SOC2 compliance readiness.
 
 ## 🚀 Quick Start
 

@@ -233,7 +233,7 @@ export default function Register() {
                                         fullWidth
                                         name="subdomain"
                                         placeholder="your-subdomain"
-                                        helperText="Your unique URL: subdomain.riskapp.com"
+                                        helperText="Your unique URL: subdomain.swotrisk.com"
                                         value={formData.subdomain}
                                         onChange={handleChange}
                                         InputProps={{
@@ -557,7 +557,7 @@ export default function Register() {
                             color: 'rgba(255, 255, 255, 0.5)',
                         }}
                     >
-                        © 2026 Risk Assessment Platform. All rights reserved.
+                        © 2026 SWOT RISK Platform. All rights reserved.
                     </Typography>
                 </Box>
             </Container>

@@ -62,7 +62,7 @@ const SOC2Dashboard: React.FC = () => {
     return (
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
             <Typography variant="h4" gutterBottom>
-                SOC2 Compliance Dashboard
+                SWOT SOC2 Dashboard
             </Typography>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
